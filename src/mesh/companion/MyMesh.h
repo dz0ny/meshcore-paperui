@@ -100,7 +100,7 @@ public:
 
   void loop();
   void handleCmdFrame(size_t len);
-  bool advert();
+  bool advert(bool flood = false);
   void enterCLIRescue();
 
   int  getRecentlyHeard(AdvertPath dest[], int max_num);
@@ -244,6 +244,16 @@ private:
   int32_t _gps_speed_prev_lat_e6;
   int32_t _gps_speed_prev_lon_e6;
   unsigned long _gps_speed_prev_ms;
+  // Moving/stationary state machine (anchor + dwell hysteresis). _gps_ref_* is the
+  // stationary anchor; while parked it slowly tracks GPS bias so cumulative drift
+  // never masquerades as travel. _gps_move_state_since_ms times the pending
+  // transition (departure when stationary, dwell-to-stop when moving).
+  bool _gps_is_moving;
+  bool _gps_ref_valid;
+  int32_t _gps_ref_lat_e6;
+  int32_t _gps_ref_lon_e6;
+  unsigned long _gps_move_state_since_ms;
+  unsigned long _gps_move_eval_ms;
 
   TransportKey send_scope;
 

@@ -252,7 +252,8 @@ void ingest_bridge_events() {
 
         sd_log::mark_dirty();
         note_incoming_message(message.sender_name[0] ? message.sender_name : nullptr,
-                              message.text[0] ? message.text : nullptr);
+                              message.text[0] ? message.text : nullptr,
+                              message.channel_idx);
     }
 
     bool contacts_changed = false;
@@ -722,7 +723,8 @@ void delete_message(int idx) {
     mark_dirty(DIRTY_MESSAGES);
 }
 
-void note_incoming_message(const char* from_name, const char* text) {
+void note_incoming_message(const char* from_name, const char* text, uint8_t channel_idx) {
+    (void)channel_idx;   // selected-channel filtering is a Wio-only feature (see model_mono.cpp)
     sleep_cfg.unread_messages++;
     note_contact_unread(from_name);   // per-contact tally for the Team screen badge
     if (from_name) {

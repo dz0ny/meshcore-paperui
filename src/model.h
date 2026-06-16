@@ -247,7 +247,10 @@ void init_messages();  // call once at startup to allocate PSRAM
 void touch_activity();  // call on any user interaction
 bool should_sleep();    // check if timeout expired
 void delete_message(int idx);  // remove message at index, shift remaining
-void note_incoming_message(const char* from_name, const char* text);
+// channel_idx is the group channel the message arrived on (0xFF for a direct
+// message). The dashboard unread count only tracks the channel selected under
+// Display settings; other channels still store/badge but don't bump the count.
+void note_incoming_message(const char* from_name, const char* text, uint8_t channel_idx);
 void clear_unread_messages();
 void mark_dirty(uint32_t flags);
 uint32_t take_dirty();

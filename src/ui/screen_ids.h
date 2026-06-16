@@ -37,4 +37,7 @@ enum screen_id {
     SCREEN_TEAM                 = 29,
     SCREEN_SOUND                = 30,
     SCREEN_DASH                 = 31,
+    SCREEN_PROVISION            = 32,
+    SCREEN_PROVISION_RUN        = 33,
+    SCREEN_PROVISION_PICK       = 34,
 };

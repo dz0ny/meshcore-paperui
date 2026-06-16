@@ -49,6 +49,11 @@ enum Str : uint16_t {
     T_MAP, T_NO_LOCATIONS, T_MOVE_TO_CAL,
     // time
     T_TIMEZONE,
+    // provision (settings sync)
+    T_PROVISION, T_SHARE_PROFILE, T_RECEIVE_PROFILE,
+    T_PROV_WAIT, T_PROV_SEARCH, T_PROV_TRANSFER, T_PROV_DONE, T_PROV_FAILED, T_PROV_SELECT,
+    // self-advert (announce this node on the mesh)
+    T_ADVERT_ZEROHOP, T_ADVERT_FLOOD, T_ADVERT_SENT,
     // language names (always shown in their own language)
     T_LANG_EN, T_LANG_SL,
     T_COUNT
@@ -78,6 +83,9 @@ inline const char* t(Str id) {
         "On my way", "Yes", "No", "Need help", "Arrived",
         "Map", "No positions yet", "Move to calibrate",
         "Time zone",
+        "Provision", "Share Profile", "Receive Profile",
+        "Waiting for receiver", "Searching...", "Transferring", "Done", "Failed", "Select device",
+        "Advert (direct)", "Advert (flood)", "Advert sent",
         "English", "Slovensko",
     };
     static const char* const SL_T[T_COUNT] = {
@@ -98,6 +106,9 @@ inline const char* t(Str id) {
         "Ze grem", "Da", "Ne", "Rabim pomoc", "Prispel",
         "Zemljevid", "Ni lokacij", "Premakni za kalib.",
         "Casovni pas",
+        "Prenos nastav.", "Deli profil", "Prejmi profil",
+        "Cakam prejemnika", "Iscem...", "Prenasam", "Koncano", "Napaka", "Izberi napravo",
+        "Oglas (direkt)", "Oglas (poplava)", "Oglas poslan",
         "English", "Slovensko",
     };
     if (id >= T_COUNT) return "";

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <stddef.h>
 #include <stdint.h>
 
 namespace mesh::task {
@@ -78,6 +79,12 @@ void set_buzzer_enabled(bool enabled);
 uint8_t get_msg_channel();
 void    set_msg_channel(uint8_t channel_idx);
 
+// Profile sync (Provision, Wio only): pack/apply the device config minus its
+// identity. profile_export returns the blob length; profile_import applies it
+// and persists, after which the caller reboots.
+size_t profile_export(uint8_t* buf, size_t max);
+bool   profile_import(const uint8_t* buf, size_t len);
+
 // Discovery: get recently heard nodes (not yet contacts)
 struct DiscoveredNode {
     char name[32];
@@ -103,6 +110,10 @@ void set_bw(float bw_khz);
 void set_sf(uint8_t sf);
 void set_cr(uint8_t cr);
 void set_tx_power(int8_t dbm);
+
+// Broadcast a self-advert so other nodes can add us as a contact. flood=false
+// reaches direct neighbours only (zero-hop); flood=true propagates mesh-wide.
+void send_advert(bool flood);
 
 // GPS location sharing over mesh adverts
 void set_gps_enabled(bool enabled);

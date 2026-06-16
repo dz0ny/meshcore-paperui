@@ -300,6 +300,14 @@ void set_tx_power(int8_t dbm) {
     the_mesh_ptr->savePrefs();
 }
 
+void send_advert(bool flood) {
+    if (!the_mesh_ptr || !mesh_mutex) return;
+    if (xSemaphoreTake(mesh_mutex, pdMS_TO_TICKS(500))) {
+        the_mesh_ptr->advert(flood);
+        xSemaphoreGive(mesh_mutex);
+    }
+}
+
 void set_gps_enabled(bool enabled) {
     if (!the_mesh_ptr) return;
 #if ENV_INCLUDE_GPS == 1

@@ -18,6 +18,7 @@
 #include "companion/NullSerialInterface.h"
 #include "companion/BridgeUITask.h"
 #include <helpers/nrf52/SerialBLEInterface.h>
+#include "provision.h"
 
 namespace mesh::task {
 
@@ -29,6 +30,7 @@ static SimpleMeshTables mc_tables;
 static DataStore*   store = nullptr;
 static MyMesh*      the_mesh = nullptr;
 static volatile bool mesh_ready = false;
+static provision::Mode prov_mode = provision::Mode::None;
 static bool         ble_active = false;
 
 // BLE-enabled state persists as a single byte in LittleFS ("/ble"), mirroring the
@@ -101,8 +103,25 @@ void start(int /*core*/) {
     bridge_ui.begin(the_mesh->getNodePrefs()->buzzer_quiet != 0);
 
     step("iface");
-    // Restore the BLE companion if it was on at last shutdown, else stay dark.
+    // A pending provision request claims Bluefruit exclusively (Share=peripheral,
+    // Receive=central), so the companion BLE must stay dark this boot. The mesh
+    // stack is already up (prefs/channels loaded for profile export/import), but
+    // the LoRa radio must now go fully idle: left in RX it fires DIO1 interrupts
+    // that starve the SoftDevice's BLE scan/advertise windows, so a receiver never
+    // hears the sharer (scan times out -> Error). Sleep the SX1262 and skip the
+    // rest of the mesh bring-up; loop() also stops driving the_mesh->loop() while
+    // provisioning, so the radio stays asleep and BLE owns the chip alone.
+    prov_mode = provision::pending();
+    if (prov_mode != provision::Mode::None) {
+        the_mesh->startInterface(null_serial);
+        radio_driver.powerOff();          // SX1262 -> sleep: no RX, no DIO1 IRQs
+        provision::begin(prov_mode);
+        step("provision");
+        mesh_ready = true;
+        return;                           // skip radio params / sensors / GPS / boot advert
+    }
     if (ble_pref_load()) {
+        // Restore the BLE companion if it was on at last shutdown, else stay dark.
         ble_serial.begin(BLE_NAME_PREFIX, the_mesh->getNodePrefs()->node_name, the_mesh->getBLEPin());
         the_mesh->startInterface(ble_serial);
         ble_active = true;
@@ -133,6 +152,9 @@ void start(int /*core*/) {
 
 void loop() {
     if (!the_mesh) return;
+    // While provisioning, BLE owns the chip: keep the LoRa radio asleep and the
+    // mesh idle (never re-arm RX) so BLE scan/advertise windows aren't starved.
+    if (prov_mode != provision::Mode::None) { provision::loop(); return; }
     the_mesh->loop();
     bridge_ui.loop();   // pump non-blocking buzzer playback
     sensors.loop();
@@ -206,6 +228,10 @@ void set_cr(uint8_t cr) {
 void set_tx_power(int8_t dbm) {
     if (!the_mesh) return;
     the_mesh->getNodePrefs()->tx_power_dbm = dbm; the_mesh->savePrefs();
+}
+
+void send_advert(bool flood) {
+    if (the_mesh) the_mesh->advert(flood);
 }
 
 void set_gps_enabled(bool enabled) {
@@ -368,6 +394,125 @@ void set_msg_channel(uint8_t channel_idx) {
 int  get_discovered(DiscoveredNode*, int) { return 0; }
 bool add_contact_by_prefix(const uint8_t*) { return false; }
 bool is_contact(const uint8_t*) { return false; }
+
+// ---- profile sync (Provision) ----------------------------------------------
+// A device's whole config minus its identity, packed into one buffer so a peer
+// can clone it over BLE. The UI prefs (tz/lang/invert) live in LittleFS byte
+// files (the same ones load_*/set_* use), so we read/write those directly here.
+namespace {
+struct __attribute__((packed)) ProfileFixed {
+    float    freq;
+    float    bw;
+    uint8_t  sf;
+    uint8_t  cr;
+    int8_t   tx_power_dbm;
+    uint8_t  gps_enabled;
+    uint32_t gps_interval;
+    uint8_t  advert_loc_policy;
+    uint8_t  fast_gps_channel_idx;
+    uint8_t  fast_gps_region;
+    uint8_t  client_repeat;
+    int8_t   tz_offset_hours;
+    uint8_t  lang;
+    uint8_t  invert;
+    uint8_t  msg_channel;
+    uint8_t  buzzer_quiet;
+};
+struct __attribute__((packed)) ProfileChannel {
+    uint8_t idx;
+    char    name[32];
+    uint8_t secret[32];
+};
+
+int read_pref_byte(const char* path) {
+    using namespace Adafruit_LittleFS_Namespace;
+    File f = InternalFS.open(path, FILE_O_READ);
+    if (!f) return -1;
+    int b = f.read(); f.close();
+    return b;
+}
+void write_pref_byte(const char* path, uint8_t v) {
+    using namespace Adafruit_LittleFS_Namespace;
+    InternalFS.remove(path);
+    File f = InternalFS.open(path, FILE_O_WRITE);
+    if (f) { f.write(&v, 1); f.close(); }
+}
+} // namespace
+
+size_t profile_export(uint8_t* buf, size_t max) {
+    if (!the_mesh || !buf) return 0;
+    NodePrefs* p = the_mesh->getNodePrefs();
+    ProfileFixed fx = {};
+    fx.freq = p->freq; fx.bw = p->bw; fx.sf = p->sf; fx.cr = p->cr;
+    fx.tx_power_dbm = p->tx_power_dbm;
+    fx.gps_enabled = p->gps_enabled; fx.gps_interval = p->gps_interval;
+    fx.advert_loc_policy = p->advert_loc_policy;
+    fx.fast_gps_channel_idx = p->fast_gps_channel_idx;
+    fx.fast_gps_region = p->fast_gps_region;
+    fx.client_repeat = p->client_repeat;
+    int tz = read_pref_byte("/tz");     fx.tz_offset_hours = (tz < 0) ? 0 : (int8_t)tz;
+    int lang = read_pref_byte("/lang"); fx.lang = (lang < 0) ? 0 : (uint8_t)lang;
+    int inv = read_pref_byte("/invert"); fx.invert = (inv < 0) ? 0 : (uint8_t)inv;
+    fx.msg_channel = get_msg_channel();
+    fx.buzzer_quiet = p->buzzer_quiet;
+
+    size_t off = 0;
+    if (sizeof(fx) + 1 > max) return 0;
+    memcpy(buf, &fx, sizeof(fx)); off = sizeof(fx);
+    uint8_t* count_at = buf + off; off += 1;
+    uint8_t count = 0;
+    for (int i = 0; i < MAX_GROUP_CHANNELS; i++) {
+        ChannelDetails ch;
+        if (!(the_mesh->getChannel(i, ch) && ch.name[0])) continue;
+        if (off + sizeof(ProfileChannel) > max) break;
+        ProfileChannel pc = {};
+        pc.idx = (uint8_t)i;
+        memcpy(pc.name, ch.name, sizeof(pc.name));
+        memcpy(pc.secret, ch.channel.secret, sizeof(pc.secret));
+        memcpy(buf + off, &pc, sizeof(pc)); off += sizeof(pc);
+        count++;
+    }
+    *count_at = count;
+    return off;
+}
+
+bool profile_import(const uint8_t* buf, size_t len) {
+    if (!the_mesh || !buf || len < sizeof(ProfileFixed) + 1) return false;
+    ProfileFixed fx;
+    memcpy(&fx, buf, sizeof(fx));
+    size_t off = sizeof(fx);
+    uint8_t count = buf[off++];
+    if (off + (size_t)count * sizeof(ProfileChannel) > len) return false;
+
+    NodePrefs* p = the_mesh->getNodePrefs();
+    p->freq = fx.freq; p->bw = fx.bw; p->sf = fx.sf; p->cr = fx.cr;
+    p->tx_power_dbm = fx.tx_power_dbm;
+    p->gps_enabled = fx.gps_enabled; p->gps_interval = fx.gps_interval;
+    p->advert_loc_policy = fx.advert_loc_policy;
+    p->fast_gps_channel_idx = fx.fast_gps_channel_idx;
+    p->fast_gps_region = fx.fast_gps_region;
+    p->client_repeat = fx.client_repeat;
+    p->buzzer_quiet = fx.buzzer_quiet;
+
+    for (uint8_t i = 0; i < count; i++) {
+        ProfileChannel pc;
+        memcpy(&pc, buf + off, sizeof(pc)); off += sizeof(pc);
+        if (pc.idx >= MAX_GROUP_CHANNELS) continue;
+        ChannelDetails ch = {};
+        memcpy(ch.name, pc.name, sizeof(ch.name));
+        ch.name[sizeof(ch.name) - 1] = 0;
+        memcpy(ch.channel.secret, pc.secret, sizeof(ch.channel.secret));
+        the_mesh->setChannel(pc.idx, ch);
+    }
+    store->saveChannels(the_mesh);   // MyMesh::saveChannels is private; go via the store
+    the_mesh->savePrefs();
+
+    write_pref_byte("/tz", (uint8_t)fx.tz_offset_hours);
+    write_pref_byte("/lang", fx.lang);
+    write_pref_byte("/invert", fx.invert);
+    set_msg_channel(fx.msg_channel);
+    return true;
+}
 
 } // namespace mesh::task
 #endif // BOARD_WIO_L1

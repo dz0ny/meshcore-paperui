@@ -177,8 +177,13 @@ const char* MyMesh::fastGpsRegionName(uint8_t idx) {
 }
 #define FIXED_GPS_INTERVAL_SECONDS      5UL
 #define FAST_GPS_MIN_MOVEMENT_METERS    10.0
-#define FAST_GPS_STATIONARY_BASE_INTERVAL_MS  (60UL * 1000UL)
-#define FAST_GPS_STATIONARY_MAX_INTERVAL_MS   (1024UL * 1000UL)
+// Parked tracker: send a keepalive beacon no more often than every 9 minutes.
+// Base == max keeps the cadence flat (no exponential backoff growth), so a
+// stationary node stays visible on the mesh without burning airtime. 9 (an odd,
+// non-round period) keeps fleets from collapsing onto a shared 5/10-min boundary,
+// so keepalives roll out of phase rather than colliding on air.
+#define FAST_GPS_STATIONARY_BASE_INTERVAL_MS  (9UL * 60UL * 1000UL)
+#define FAST_GPS_STATIONARY_MAX_INTERVAL_MS   (9UL * 60UL * 1000UL)
 #define FAST_GPS_CHANNEL_RX_HOLDOFF_MS        5000UL
 #define FAST_GPS_SPEED_IDLE_MAX_MPS           0.75
 #define FAST_GPS_SPEED_WALK_MAX_MPS           1.8
@@ -186,6 +191,17 @@ const char* MyMesh::fastGpsRegionName(uint8_t idx) {
 #define FAST_GPS_WALK_INTERVAL_MS             (30UL * 1000UL)
 #define FAST_GPS_FAST_INTERVAL_MS             (15UL * 1000UL)
 #define FAST_GPS_VERY_FAST_INTERVAL_MS        (5UL * 1000UL)
+
+// Moving/stationary detection (position-only — the GPS exposes no Doppler speed).
+// A parked fix wanders several metres and can glitch tens of metres on multipath
+// or atmospheric/satellite-geometry changes; differencing raw positions reads that
+// as travel and paints a fake track. Instead we hold a stationary "anchor" and
+// require *sustained* displacement to flip to moving (and a long dwell back near an
+// anchor to flip to stationary) — jitter that returns toward the anchor is absorbed.
+#define FAST_GPS_MOVE_RADIUS_M                (25.0)         // jitter cloud radius
+#define FAST_GPS_MOVE_DWELL_MS                (15UL * 1000UL) // sustained-away to start moving
+#define FAST_GPS_STOP_DWELL_MS                (60UL * 1000UL) // sustained-near to declare stopped
+#define FAST_GPS_MOVE_EVAL_MS                 (1000UL)        // state-machine tick
 
 // Proximity-based repeat suppression. When a group (channel) packet arrives from
 // a node that is physically right next to us there is no value in repeating it —
@@ -1022,6 +1038,12 @@ MyMesh::MyMesh(mesh::Radio &radio, mesh::RNG &rng, mesh::RTCClock &rtc, SimpleMe
   _gps_speed_prev_lat_e6 = 0;
   _gps_speed_prev_lon_e6 = 0;
   _gps_speed_prev_ms = 0;
+  _gps_is_moving = false;
+  _gps_ref_valid = false;
+  _gps_ref_lat_e6 = 0;
+  _gps_ref_lon_e6 = 0;
+  _gps_move_state_since_ms = 0;
+  _gps_move_eval_ms = 0;
   memset(advert_paths, 0, sizeof(advert_paths));
   memset(send_scope.key, 0, sizeof(send_scope.key));
 
@@ -1205,6 +1227,57 @@ void MyMesh::updateGpsStatusCache() {
     }
   }
 
+  // Moving/stationary state machine (anchor + dwell hysteresis), evaluated ~1 Hz.
+  // The instantaneous speed above spikes on a single glitch fix, so it can't be
+  // trusted alone to say "moving". Here a parked node holds an anchor: jitter and
+  // glitches stay within FAST_GPS_MOVE_RADIUS_M and are absorbed (the anchor even
+  // tracks slow GPS bias), and only displacement sustained past the radius for
+  // FAST_GPS_MOVE_DWELL_MS flips to moving. Once moving, the anchor chases the
+  // path; we declare stopped only after dwelling near it for FAST_GPS_STOP_DWELL_MS.
+  if (now_ms - _gps_move_eval_ms >= FAST_GPS_MOVE_EVAL_MS) {
+    _gps_move_eval_ms = now_ms;
+    if (!_gps_ref_valid) {
+      _gps_ref_lat_e6 = _gps_last_fix_lat_e6;
+      _gps_ref_lon_e6 = _gps_last_fix_lon_e6;
+      _gps_ref_valid = true;
+      _gps_move_state_since_ms = 0;
+      _gps_is_moving = false;
+    } else {
+      double ref_dist = calcFastGpsDistanceMeters(_gps_ref_lat_e6, _gps_ref_lon_e6,
+                                                  _gps_last_fix_lat_e6, _gps_last_fix_lon_e6);
+      if (!_gps_is_moving) {
+        if (ref_dist > FAST_GPS_MOVE_RADIUS_M) {
+          if (_gps_move_state_since_ms == 0) {
+            _gps_move_state_since_ms = now_ms;
+          } else if (now_ms - _gps_move_state_since_ms >= FAST_GPS_MOVE_DWELL_MS) {
+            _gps_is_moving = true;
+            _gps_ref_lat_e6 = _gps_last_fix_lat_e6;
+            _gps_ref_lon_e6 = _gps_last_fix_lon_e6;
+            _gps_move_state_since_ms = 0;
+          }
+        } else {
+          _gps_move_state_since_ms = 0;
+          // Track slow GPS bias so cumulative drift never reaches the radius.
+          _gps_ref_lat_e6 += (_gps_last_fix_lat_e6 - _gps_ref_lat_e6) / 8;
+          _gps_ref_lon_e6 += (_gps_last_fix_lon_e6 - _gps_ref_lon_e6) / 8;
+        }
+      } else {
+        if (ref_dist > FAST_GPS_MOVE_RADIUS_M) {
+          _gps_ref_lat_e6 = _gps_last_fix_lat_e6;
+          _gps_ref_lon_e6 = _gps_last_fix_lon_e6;
+          _gps_move_state_since_ms = 0;
+        } else if (_gps_move_state_since_ms == 0) {
+          _gps_move_state_since_ms = now_ms;
+        } else if (now_ms - _gps_move_state_since_ms >= FAST_GPS_STOP_DWELL_MS) {
+          _gps_is_moving = false;
+          _gps_ref_lat_e6 = _gps_last_fix_lat_e6;
+          _gps_ref_lon_e6 = _gps_last_fix_lon_e6;
+          _gps_move_state_since_ms = 0;
+        }
+      }
+    }
+  }
+
   uint32_t timestamp = (uint32_t)location->getTimestamp();
   if (timestamp == 0) {
     timestamp = getRTCClock()->getCurrentTime();
@@ -1232,29 +1305,34 @@ void MyMesh::maybeSendFastGpsUpdate() {
     return;
   }
 
-  // Stationary suppression: while ground speed rounds to 0 km/h, send nothing at
-  // all — no movement beacons, no stationary keepalives. Clearing the share state
-  // means the instant we start moving again (_gps_speed_kmh climbs back above the
-  // 0.5 km/h rounding floor used for the speed byte below) an immediate position
-  // beacon goes out. Saves airtime and battery while the tracker is parked.
-  if (_gps_speed_kmh < 0.5) {
-    resetFastGpsShareState();
-    return;
-  }
-
+  // Stationary nodes are NOT silenced — they still emit a position beacon so a
+  // parked tracker stays visible on the mesh. Moving vs stationary is decided by
+  // the hysteresis state machine (_gps_is_moving), NOT by raw displacement since
+  // the last send — so multipath/atmospheric jitter on a parked node can't be
+  // mistaken for travel and paint a fake track. When moving we use the faster
+  // speed-based cadence; when parked we send the de-jittered anchor position on a
+  // flat keepalive (FAST_GPS_STATIONARY_*_INTERVAL_MS). The speed byte rounds
+  // sub-0.5 km/h to 0, so the keepalive reports parked.
   unsigned long now_ms = futureMillis(0);
-  int32_t lat_e6 = (int32_t)location->getLatitude();
-  int32_t lon_e6 = (int32_t)location->getLongitude();
+  int32_t lat_e6, lon_e6;
+  if (_gps_is_moving || !_gps_ref_valid) {
+    lat_e6 = (int32_t)location->getLatitude();
+    lon_e6 = (int32_t)location->getLongitude();
+  } else {
+    lat_e6 = _gps_ref_lat_e6;   // parked: report the stable anchor, not the wander
+    lon_e6 = _gps_ref_lon_e6;
+  }
   bool should_send = !_fast_gps_last_sent_valid;
   bool reset_stationary_backoff = should_send;
   if (!should_send) {
-    double distance_m = calcFastGpsDistanceMeters(
-        _fast_gps_last_sent_lat_e6,
-        _fast_gps_last_sent_lon_e6,
-        lat_e6,
-        lon_e6);
-    if (distance_m > FAST_GPS_MIN_MOVEMENT_METERS) {
-      if (_fast_gps_last_sent_at_ms != 0 && now_ms > _fast_gps_last_sent_at_ms) {
+    if (_gps_is_moving) {
+      double distance_m = calcFastGpsDistanceMeters(
+          _fast_gps_last_sent_lat_e6,
+          _fast_gps_last_sent_lon_e6,
+          lat_e6,
+          lon_e6);
+      if (distance_m > FAST_GPS_MIN_MOVEMENT_METERS &&
+          _fast_gps_last_sent_at_ms != 0 && now_ms > _fast_gps_last_sent_at_ms) {
         unsigned long elapsed_ms = now_ms - _fast_gps_last_sent_at_ms;
         double speed_mps = (distance_m * 1000.0) / (double)elapsed_ms;
         unsigned long movement_interval_ms = calcFastGpsMovingIntervalMs(speed_mps);
@@ -2651,7 +2729,7 @@ void MyMesh::loop() {
 
 }
 
-bool MyMesh::advert() {
+bool MyMesh::advert(bool flood) {
   mesh::Packet* pkt;
   if (_prefs.advert_loc_policy == ADVERT_LOC_NONE) {
     pkt = createSelfAdvert(_prefs.node_name);
@@ -2659,7 +2737,8 @@ bool MyMesh::advert() {
     pkt = createSelfAdvert(_prefs.node_name, sensors.node_lat, sensors.node_lon);
   }
   if (pkt) {
-    sendZeroHop(pkt);
+    if (flood) sendFlood(pkt, (uint32_t)0, _prefs.path_hash_mode + 1);
+    else       sendZeroHop(pkt);
     return true;
   } else {
     return false;

@@ -91,9 +91,13 @@ void init_messages() {
 void touch_activity() {}
 bool should_sleep() { return false; }
 void delete_message(int) {}
-void note_incoming_message(const char* from, const char* text) {
+void note_incoming_message(const char* from, const char* text, uint8_t channel_idx) {
+    note_contact_unread(from);   // per-contact tally for the Team screen badge (all channels)
+
+    // Dashboard/lock-screen unread count + preview track only the selected channel.
+    if (channel_idx != mesh::task::get_msg_channel()) return;
+
     sleep_cfg.unread_messages++;
-    note_contact_unread(from);   // per-contact tally for the Team screen badge
     if (from) { strncpy(sleep_cfg.last_sender, from, sizeof(sleep_cfg.last_sender) - 1); }
     if (text) { strncpy(sleep_cfg.last_message, text, sizeof(sleep_cfg.last_message) - 1); }
 }
@@ -118,7 +122,8 @@ void ingest_bridge_events() {
             message_count++;
         }
         note_incoming_message(m.sender_name[0] ? m.sender_name : nullptr,
-                              m.text[0] ? m.text : nullptr);
+                              m.text[0] ? m.text : nullptr,
+                              m.channel_idx);
     }
     mesh::bridge::PositionUpdate p = {};
     while (mesh::bridge::pop_position(p)) {

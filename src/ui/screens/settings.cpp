@@ -15,8 +15,9 @@ static void on_mesh(void*)    { ui::screen_mgr::push(SCREEN_SET_MESH, true); }
 static void on_display(void*) { ui::screen_mgr::push(SCREEN_SET_DISPLAY, true); }
 static void on_ble(void*)     { ui::screen_mgr::push(SCREEN_SET_BLE, true); }
 #ifdef BOARD_WIO_L1
-static void on_sound(void*)   { ui::screen_mgr::push(SCREEN_SOUND, true); }
-static void on_privacy(void*) { ui::screen_mgr::push(SCREEN_PRIVACY, true); }
+static void on_sound(void*)     { ui::screen_mgr::push(SCREEN_SOUND, true); }
+static void on_privacy(void*)   { ui::screen_mgr::push(SCREEN_PRIVACY, true); }
+static void on_provision(void*) { ui::screen_mgr::push(SCREEN_PROVISION, true); }
 #endif
 #ifndef BOARD_WIO_L1
 static void on_storage(void*) { ui::screen_mgr::push(SCREEN_SET_STORAGE, true); }
@@ -34,6 +35,7 @@ static void create(Handle parent) {
     menu_row(menu, i18n::t(i18n::T_GPS_SETTINGS),  on_gps,     nullptr);
     menu_row(menu, i18n::t(i18n::T_MESH_SETTINGS), on_mesh,    nullptr);
     menu_row(menu, i18n::t(i18n::T_PRIVACY),       on_privacy, nullptr);
+    menu_row(menu, i18n::t(i18n::T_PROVISION),     on_provision, nullptr);
 #else
     menu_row(menu, "Display",       on_display, nullptr);
     menu_row(menu, "Bluetooth",     on_ble,     nullptr);

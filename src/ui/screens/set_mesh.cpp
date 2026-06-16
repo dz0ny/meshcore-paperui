@@ -6,6 +6,7 @@
 #include "../ui_screen_mgr.h"
 #include "../kit/ui_kit.h"
 #include "../i18n.h"
+#include "../components/toast.h"
 #include "../../model.h"
 #include "../../mesh/mesh_task.h"
 
@@ -82,6 +83,14 @@ static void on_repeat(void*) {
     mesh::task::set_client_repeat(!cur);
     if (lbl_repeat) set_text(lbl_repeat, i18n::t(!cur ? i18n::T_ON : i18n::T_OFF));
 }
+static void on_advert_zerohop(void*) {
+    mesh::task::send_advert(false);
+    ui::toast::show(i18n::t(i18n::T_ADVERT_SENT));
+}
+static void on_advert_flood(void*) {
+    mesh::task::send_advert(true);
+    ui::toast::show(i18n::t(i18n::T_ADVERT_SENT));
+}
 
 static void create(Handle parent) {
     Handle lst = list(parent);
@@ -107,6 +116,9 @@ static void create(Handle parent) {
     lbl_gps_share = toggle_item(lst, i18n::t(i18n::T_GPS_SHARE), i18n::t(mesh::task::get_advert_location() ? i18n::T_ON : i18n::T_OFF), on_gps_share, nullptr);
 #endif
     lbl_repeat = toggle_item(lst, i18n::t(i18n::T_REPEAT), i18n::t(mesh::task::get_client_repeat() ? i18n::T_ON : i18n::T_OFF), on_repeat, nullptr);
+
+    menu_row(lst, i18n::t(i18n::T_ADVERT_ZEROHOP), on_advert_zerohop, nullptr);
+    menu_row(lst, i18n::t(i18n::T_ADVERT_FLOOD),   on_advert_flood,   nullptr);
 }
 
 static void entry() {}

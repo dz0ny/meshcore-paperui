@@ -24,9 +24,11 @@
 #include "ui/screens/trail.h"
 #include "ui/screens/battery.h"
 #include "ui/screens/team.h"
+#include "ui/screens/provision.h"
 #include "model.h"
 #include "trail_store.h"
 #include "mesh/mesh_task.h"
+#include "mesh/provision.h"
 #include "mesh/companion/target.h"           // sensors, rtc_clock
 #include <helpers/sensors/LocationProvider.h>
 
@@ -267,6 +269,11 @@ static void poll_buttons() {
             b.t = now;
             if (ui::screen_mgr::top_id() == SCREEN_DASH)
                 ui::screen_mgr::push(SCREEN_HOME, true);   // any button leaves the dashboard for the menu
+            else if (ui::screen_mgr::top_id() == SCREEN_PROVISION_RUN ||
+                     ui::screen_mgr::top_id() == SCREEN_PROVISION_PICK) {
+                if (b.key == 'B') provision::reboot();     // abort provisioning → normal boot
+                else              mono::feed_key(b.key);    // navigate the device picker (no-op on run)
+            }
             else if (b.key == 'B') ui::screen_mgr::pop(false);
             else                   mono::feed_key(b.key);
         }
@@ -346,8 +353,19 @@ void setup() {
     ui::screen_mgr::register_screen(SCREEN_TRAIL,    &ui::screen::trail::lifecycle);
     ui::screen_mgr::register_screen(SCREEN_BATTERY,  &ui::screen::battery::lifecycle);
     ui::screen_mgr::register_screen(SCREEN_TEAM,     &ui::screen::team::lifecycle);
+    ui::screen_mgr::register_screen(SCREEN_PROVISION,      &ui::screen::provision::lifecycle);
+    ui::screen_mgr::register_screen(SCREEN_PROVISION_RUN,  &ui::screen::provision::run_lifecycle);
+    ui::screen_mgr::register_screen(SCREEN_PROVISION_PICK, &ui::screen::provision::pick_lifecycle);
     mono::set_statusbar(14, draw_statusbar);
-    ui::screen_mgr::switch_to(SCREEN_DASH, false);
+    // A pending provision request reboots into an exclusive BLE mode (the companion
+    // radio is skipped in mesh::task::start). Receive lands on the device picker
+    // (choose a sharer), Share on the transfer-status screen; everything else boots
+    // to the dashboard.
+    provision::Mode pm = provision::pending();
+    int boot_screen = (pm == provision::Mode::Receive) ? SCREEN_PROVISION_PICK
+                    : (pm == provision::Mode::Share)   ? SCREEN_PROVISION_RUN
+                                                       : SCREEN_DASH;
+    ui::screen_mgr::switch_to(boot_screen, false);
 
     // To debug a mesh-init hang, install the e-ink step drawer so the frozen
     // panel shows the last step reached:  mesh::task::diag_step = draw_mesh_step;
