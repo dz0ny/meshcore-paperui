@@ -61,7 +61,7 @@ TARGETS = [
     },
 ]
 
-PROJECT_NAME = "MeshCore t-paper"
+PROJECT_NAME = "MeshUI"
 
 
 def parse_args() -> argparse.Namespace:
