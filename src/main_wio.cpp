@@ -324,11 +324,28 @@ static Btn g_btns[] = {
     { BTN_PRESS, 'E', false, 0 },
     { BTN_BACK,  'B', false, 0 },
 };
+static const int N_BTN = sizeof(g_btns) / sizeof(g_btns[0]);
+
+// A press edge sets the matching latch from an ISR, so taps that land while the
+// loop is blocked in an e-ink redraw (compass/trail timers, clock, mesh, etc.)
+// are still registered instead of silently dropped. attachInterrupt() takes an
+// argless handler, so there's one tiny ISR per button.
+static volatile bool g_latch[N_BTN] = {};
+#define BTN_ISR(i) static void isr_btn##i() { g_latch[i] = true; }
+BTN_ISR(0) BTN_ISR(1) BTN_ISR(2) BTN_ISR(3) BTN_ISR(4) BTN_ISR(5)
+static void (*const g_isr[N_BTN])() = { isr_btn0, isr_btn1, isr_btn2, isr_btn3, isr_btn4, isr_btn5 };
+
 static void poll_buttons() {
     uint32_t now = millis();
-    for (auto& b : g_btns) {
+    for (int i = 0; i < N_BTN; i++) {
+        auto& b = g_btns[i];
         bool down = (digitalRead(b.pin) == LOW);
-        if (down && !b.prev && (now - b.t) > 150) {
+        bool latched = false;
+        noInterrupts();
+        if (g_latch[i]) { g_latch[i] = false; latched = true; }
+        interrupts();
+        // Fire on a live edge OR a press the ISR caught during a blocking redraw.
+        if ((latched || (down && !b.prev)) && (now - b.t) > 150) {
             b.t = now;
             // The on-screen keyboard is modal: it consumes every key (incl. L/R
             // and back-as-cancel) until it closes itself.
@@ -394,7 +411,10 @@ void setup() {
     Serial.begin(115200);
     delay(200);
     board_wio::init();
-    for (auto& b : g_btns) pinMode(b.pin, INPUT_PULLUP);
+    for (int i = 0; i < N_BTN; i++) {
+        pinMode(g_btns[i].pin, INPUT_PULLUP);
+        attachInterrupt(g_btns[i].pin, g_isr[i], FALLING);   // latch presses, even mid-redraw
+    }
 
     load_language();         // pick up the saved UI language before building screens
     load_timezone();         // and the saved timezone offset for the clock
