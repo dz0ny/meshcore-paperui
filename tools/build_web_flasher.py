@@ -25,6 +25,7 @@ TARGETS = [
         "env": "t5-epaper",
         "slug": "lilygo-t5-epaper-pro",
         "device_name": "LilyGo T5 ePaper S3 Pro",
+        "tab_label": "T5 ePaper",
         "flash_method": "esp-web-tools",
         "chip_label": CHIP_FAMILY,
         "description": "Flash the latest PlatformIO build for the LilyGo T5 ePaper S3 Pro directly from Chrome or Edge with ESP Web Tools. It works as both a standalone mesh device and a companion-connected MeshCore node.",
@@ -41,6 +42,7 @@ TARGETS = [
         "env": "tdeck",
         "slug": "tdeck",
         "device_name": "LilyGo T-Deck",
+        "tab_label": "T-Deck",
         "flash_method": "esp-web-tools",
         "chip_label": CHIP_FAMILY,
         "description": "Flash the latest PlatformIO build for the LilyGo T-Deck directly from Chrome or Edge with ESP Web Tools. It works as both a standalone mesh device and a companion-connected MeshCore node.",
@@ -52,6 +54,7 @@ TARGETS = [
         "env": "wio-tracker-l1",
         "slug": "wio-tracker-l1",
         "device_name": "Seeed Wio Tracker L1",
+        "tab_label": "Wio Tracker L1",
         "flash_method": "web-serial-dfu",
         "chip_label": "nRF52840",
         "description": "The Wio Tracker L1 is an nRF52840 mono e-ink tracker. Double-tap RESET to enter the bootloader, then flash it straight from Chrome or Edge over Web Serial — no toolchain or drag-and-drop required. A UF2 download is provided as a fallback.",
@@ -92,7 +95,32 @@ def find_boot_app0(explicit_path: str | None) -> Path:
     raise FileNotFoundError(path)
 
 
-def build_target_card(target: dict, version: str) -> str:
+# shadcn/ui component class strings (faithful static port — same markup the React
+# components emit, on the Tailwind CDN). Kept as constants so the f-strings below
+# stay readable.
+BTN_PRIMARY = (
+    "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm "
+    "font-medium ring-offset-background transition-colors focus-visible:outline-none "
+    "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 "
+    "disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground "
+    "hover:bg-primary/90 h-10 px-4 py-2"
+)
+BTN_LINK = "text-sm font-medium text-primary underline-offset-4 hover:underline"
+BADGE_SECONDARY = (
+    "inline-flex items-center rounded-md border border-transparent bg-secondary px-2.5 "
+    "py-0.5 text-xs font-semibold text-secondary-foreground"
+)
+BADGE_OUTLINE = (
+    "inline-flex items-center rounded-md border px-2.5 py-0.5 text-xs font-semibold text-foreground"
+)
+INSTR_PANEL = "rounded-md border bg-muted/40 p-4 text-sm leading-6 text-muted-foreground"
+LOG_PRE = (
+    "max-h-44 overflow-auto whitespace-pre-wrap rounded-md border bg-muted/40 p-3 "
+    "font-mono text-xs leading-5 text-muted-foreground"
+)
+
+
+def build_target_panel(target: dict, version: str, active: bool) -> str:
     safe_version = html.escape(version)
     device_name = html.escape(target["device_name"])
     description = html.escape(target["description"])
@@ -105,31 +133,31 @@ def build_target_card(target: dict, version: str) -> str:
     if target.get("product_image"):
         img = html.escape(target["product_image"])
         product_image_html = f"""
-          <div class="border border-paper-line bg-[#fcfcfa] p-4">
-            <img
-              src="{slug}/{img}"
-              alt="{device_name} home screen"
-              class="mx-auto w-full max-w-[22rem] border border-paper-line object-cover"
-            />
-          </div>"""
+            <div class="rounded-md border bg-muted/30 p-4">
+              <img
+                src="{slug}/{img}"
+                alt="{device_name} home screen"
+                class="mx-auto w-full max-w-sm rounded-md border object-cover"
+              />
+            </div>"""
 
     screenshots_html = ""
     if target.get("screenshots"):
         imgs = "\n".join(
-            f'              <img src="{slug}/{html.escape(name)}" alt="{html.escape(alt)}" class="w-full border border-paper-line object-cover" />'
+            f'                <img src="{slug}/{html.escape(name)}" alt="{html.escape(alt)}" class="w-full rounded-md border object-cover" />'
             for name, alt in target["screenshots"]
         )
         screenshots_html = f"""
-          <div class="grid gap-3 border border-paper-line bg-[#fcfcfa] p-4">
-            <p class="text-sm font-semibold uppercase tracking-[0.08em] text-paper-muted">Screens</p>
-            <div class="grid grid-cols-2 gap-3 max-sm:grid-cols-1">
+            <div class="space-y-3 rounded-md border bg-muted/30 p-4">
+              <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Screens</p>
+              <div class="grid grid-cols-2 gap-3 max-sm:grid-cols-1">
 {imgs}
-            </div>
-          </div>"""
+              </div>
+            </div>"""
 
     product_link = ""
     if product_url:
-        product_link = f'<a class="text-paper-accent underline decoration-1 underline-offset-2" href="{product_url}">Product Page</a>'
+        product_link = f'<a class="{BTN_LINK}" href="{product_url}">Product page</a>'
 
     eyebrow = "Browser Flasher"
     if method == "uf2":
@@ -138,79 +166,98 @@ def build_target_card(target: dict, version: str) -> str:
         eyebrow = "Web Serial Flasher"
 
     if method == "web-serial-dfu":
-        bin_name = f"{slug}-{version}.bin"
-        dat_name = f"{slug}-{version}.dat"
-        uf2_name = f"{slug}-{version}.uf2"
-        bin_attr = html.escape(f"{slug}/{bin_name}", quote=True)
-        dat_attr = html.escape(f"{slug}/{dat_name}", quote=True)
-        uf2_href = html.escape(f"{slug}/{uf2_name}", quote=True)
+        bin_attr = html.escape(f"{slug}/{slug}-{version}.bin", quote=True)
+        dat_attr = html.escape(f"{slug}/{slug}-{version}.dat", quote=True)
+        uf2_href = html.escape(f"{slug}/{slug}-{version}.uf2", quote=True)
         action_html = f"""
-          <div
-            data-nrf-dfu
-            data-bin="{bin_attr}"
-            data-dat="{dat_attr}"
-            class="grid gap-3"
-          >
-            <div class="flex flex-wrap items-center gap-4">
-              <button data-nrf-connect class="inline-block border border-paper-line bg-paper-accent px-5 py-3 text-sm font-semibold text-paper-panel disabled:opacity-60">Connect &amp; Flash</button>
+            <div data-nrf-dfu data-bin="{bin_attr}" data-dat="{dat_attr}" class="space-y-4">
+              <div class="flex flex-wrap items-center gap-3">
+                <button data-nrf-connect class="{BTN_PRIMARY}">Connect &amp; Flash</button>
+                {product_link}
+              </div>
+              <progress data-nrf-progress hidden class="ui-progress h-2 w-full"></progress>
+              <pre data-nrf-log hidden class="{LOG_PRE}"></pre>
+            </div>
+            <div class="{INSTR_PANEL}">
+              <p class="font-medium text-foreground">Flash over Web Serial (Chrome/Edge)</p>
+              <ol class="mt-2 list-decimal space-y-1 pl-5">
+                <li>Connect the tracker to your computer with a USB data cable.</li>
+                <li>Double-tap the <strong>RESET</strong> button to enter the bootloader — a <code>TRACKER L1</code> drive appears.</li>
+                <li>Click <strong>Connect &amp; Flash</strong> and pick the tracker's serial port. Progress shows below.</li>
+              </ol>
+              <p class="mt-3">Prefer drag-and-drop? <a class="{BTN_LINK}" href="{uf2_href}" download>Download the UF2</a> and copy it onto the <code>TRACKER L1</code> drive instead.</p>
+            </div>"""
+    elif method == "uf2":
+        href = html.escape(f"{slug}/{slug}-{version}.uf2", quote=True)
+        action_html = f"""
+            <div class="flex flex-wrap items-center gap-3">
+              <a class="{BTN_PRIMARY}" href="{href}" download>Download UF2 firmware</a>
               {product_link}
             </div>
-            <progress data-nrf-progress hidden class="h-2 w-full"></progress>
-            <pre data-nrf-log hidden class="max-h-44 overflow-auto whitespace-pre-wrap border border-paper-line bg-[#fcfcfa] p-3 text-xs leading-5 text-paper-muted"></pre>
-          </div>
-          <div class="border border-paper-line bg-[#fcfcfa] p-4 text-sm leading-6 text-paper-muted">
-            <p class="font-semibold text-paper-text">Flash over Web Serial (Chrome/Edge)</p>
-            <ol class="mt-2 list-decimal space-y-1 pl-5">
-              <li>Connect the tracker to your computer with a USB data cable.</li>
-              <li>Double-tap the <strong>RESET</strong> button to enter the bootloader — a <code>TRACKER L1</code> drive appears.</li>
-              <li>Click <strong>Connect &amp; Flash</strong> and pick the tracker's serial port. Progress shows below.</li>
-            </ol>
-            <p class="mt-3">Prefer drag-and-drop? <a class="text-paper-accent underline decoration-1 underline-offset-2" href="{uf2_href}" download>Download the UF2</a> and copy it onto the <code>TRACKER L1</code> drive instead.</p>
-          </div>"""
-    elif method == "uf2":
-        uf2_name = f"{slug}-{version}.uf2"
-        href = html.escape(f"{slug}/{uf2_name}", quote=True)
-        action_html = f"""
-          <div class="flex flex-wrap items-center gap-4">
-            <a class="inline-block border border-paper-line bg-paper-accent px-5 py-3 text-sm font-semibold text-paper-panel" href="{href}" download>Download UF2 firmware</a>
-            {product_link}
-          </div>
-          <div class="border border-paper-line bg-[#fcfcfa] p-4 text-sm leading-6 text-paper-muted">
-            <p class="font-semibold text-paper-text">Install (drag &amp; drop)</p>
-            <ol class="mt-2 list-decimal space-y-1 pl-5">
-              <li>Connect the tracker to your computer over USB.</li>
-              <li>Double-tap the <strong>RESET</strong> button to enter the bootloader — a <code>TRACKER L1</code> drive appears.</li>
-              <li>Copy the downloaded <code>.uf2</code> onto that drive. The board reboots into the new firmware automatically.</li>
-            </ol>
-          </div>"""
+            <div class="{INSTR_PANEL}">
+              <p class="font-medium text-foreground">Install (drag &amp; drop)</p>
+              <ol class="mt-2 list-decimal space-y-1 pl-5">
+                <li>Connect the tracker to your computer over USB.</li>
+                <li>Double-tap the <strong>RESET</strong> button to enter the bootloader — a <code>TRACKER L1</code> drive appears.</li>
+                <li>Copy the downloaded <code>.uf2</code> onto that drive. The board reboots into the new firmware automatically.</li>
+              </ol>
+            </div>"""
     else:
         manifest = html.escape(f"{slug}/manifest.json", quote=True)
         action_html = f"""
-          <div class="flex flex-wrap items-center gap-4">
-            <esp-web-install-button manifest="{manifest}"></esp-web-install-button>
-            {product_link}
-          </div>"""
+            <div class="flex flex-wrap items-center gap-3">
+              <esp-web-install-button manifest="{manifest}"></esp-web-install-button>
+              {product_link}
+            </div>"""
 
+    hidden = "" if active else " hidden"
     return f"""
-      <section class="overflow-hidden border border-paper-line bg-paper-panel">
-        <div class="border-b border-paper-line p-7 max-sm:p-5">
-          <p class="mb-3 text-xs font-semibold uppercase tracking-[0.08em] text-paper-muted">{eyebrow}</p>
-          <h1 class="text-[clamp(1.5rem,5vw,2.4rem)] font-bold leading-none">{device_name}</h1>
-          <p class="mt-4 max-w-[34rem] text-base leading-6 text-paper-muted">{description}</p>
+      <div role="tabpanel" data-panel="{slug}" aria-labelledby="tab-{slug}"{hidden}>
+        <div class="rounded-lg border bg-card text-card-foreground shadow-sm">
+          <div class="flex flex-col space-y-1.5 p-6">
+            <div><span class="{BADGE_OUTLINE}">{eyebrow}</span></div>
+            <h2 class="text-2xl font-semibold leading-none tracking-tight">{device_name}</h2>
+            <p class="text-sm text-muted-foreground">{description}</p>
+          </div>
+          <div class="space-y-6 p-6 pt-0">
+            <div class="flex flex-wrap gap-2">
+              <span class="{BADGE_SECONDARY}">Chip: {chip_label}</span>
+              <span class="{BADGE_SECONDARY}">Build: {safe_version}</span>
+            </div>{action_html}{product_image_html}{screenshots_html}
+          </div>
         </div>
-        <div class="grid gap-5 p-7 max-sm:p-5">
-          <div class="flex flex-wrap gap-2">
-            <span class="border border-paper-line bg-[#fcfcfa] px-3 py-2 text-sm">Device: {device_name}</span>
-            <span class="border border-paper-line bg-[#fcfcfa] px-3 py-2 text-sm">Chip: {chip_label}</span>
-            <span class="border border-paper-line bg-[#fcfcfa] px-3 py-2 text-sm">Build: {safe_version}</span>
-          </div>{action_html}{product_image_html}{screenshots_html}
-        </div>
-      </section>"""
+      </div>"""
+
+
+def build_tablist(targets: list[dict]) -> str:
+    triggers = []
+    for i, t in enumerate(targets):
+        slug = t["slug"]
+        label = html.escape(t.get("tab_label", t["device_name"]))
+        state = "active" if i == 0 else "inactive"
+        triggers.append(
+            f'        <button role="tab" id="tab-{slug}" data-tab="{slug}" data-state="{state}" '
+            f'aria-controls="{slug}" class="inline-flex flex-1 items-center justify-center '
+            f'whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium ring-offset-background '
+            f'transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring '
+            f'data-[state=active]:bg-background data-[state=active]:text-foreground '
+            f'data-[state=active]:shadow-sm">{label}</button>'
+        )
+    inner = "\n".join(triggers)
+    return (
+        '      <div role="tablist" class="inline-flex h-auto w-full flex-wrap items-center '
+        'justify-center gap-1 rounded-md bg-muted p-1 text-muted-foreground">\n'
+        f"{inner}\n"
+        "      </div>"
+    )
 
 
 def build_page(version: str, repo_url: str) -> str:
     safe_repo_url = html.escape(repo_url, quote=True)
-    cards = "\n".join(build_target_card(t, version) for t in TARGETS)
+    tablist = build_tablist(TARGETS)
+    panels = "\n".join(
+        build_target_panel(t, version, active=(i == 0)) for i, t in enumerate(TARGETS)
+    )
     return f"""<!doctype html>
 <html lang="en">
   <head>
@@ -219,24 +266,29 @@ def build_page(version: str, repo_url: str) -> str:
     <title>{PROJECT_NAME}</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
       tailwind.config = {{
         theme: {{
           extend: {{
-            fontFamily: {{
-              sans: ["Montserrat", "sans-serif"]
-            }},
+            fontFamily: {{ sans: ["Inter", "ui-sans-serif", "system-ui", "sans-serif"] }},
             colors: {{
-              paper: {{
-                bg: "#efefec",
-                panel: "#f8f8f5",
-                line: "#d7d7d1",
-                text: "#20201d",
-                muted: "#6c6c67",
-                accent: "#2b2b28"
-              }}
+              border: "hsl(var(--border))",
+              input: "hsl(var(--input))",
+              ring: "hsl(var(--ring))",
+              background: "hsl(var(--background))",
+              foreground: "hsl(var(--foreground))",
+              primary: {{ DEFAULT: "hsl(var(--primary))", foreground: "hsl(var(--primary-foreground))" }},
+              secondary: {{ DEFAULT: "hsl(var(--secondary))", foreground: "hsl(var(--secondary-foreground))" }},
+              muted: {{ DEFAULT: "hsl(var(--muted))", foreground: "hsl(var(--muted-foreground))" }},
+              accent: {{ DEFAULT: "hsl(var(--accent))", foreground: "hsl(var(--accent-foreground))" }},
+              card: {{ DEFAULT: "hsl(var(--card))", foreground: "hsl(var(--card-foreground))" }}
+            }},
+            borderRadius: {{
+              lg: "var(--radius)",
+              md: "calc(var(--radius) - 2px)",
+              sm: "calc(var(--radius) - 4px)"
             }}
           }}
         }}
@@ -245,39 +297,80 @@ def build_page(version: str, repo_url: str) -> str:
     <script type="module" src="https://unpkg.com/esp-web-tools@10/dist/web/install-button.js?module"></script>
     <script type="module" src="nrf52-dfu.js"></script>
     <style>
+      /* shadcn/ui "neutral" base color — light theme tokens */
       :root {{
-        --esp-tools-button-color: #2b2b28;
-        --esp-tools-button-text-color: #f8f8f5;
-        --esp-tools-button-border-radius: 0;
+        --background: 0 0% 100%;
+        --foreground: 0 0% 3.9%;
+        --card: 0 0% 100%;
+        --card-foreground: 0 0% 3.9%;
+        --primary: 0 0% 9%;
+        --primary-foreground: 0 0% 98%;
+        --secondary: 0 0% 96.1%;
+        --secondary-foreground: 0 0% 9%;
+        --muted: 0 0% 96.1%;
+        --muted-foreground: 0 0% 45.1%;
+        --accent: 0 0% 96.1%;
+        --accent-foreground: 0 0% 9%;
+        --border: 0 0% 89.8%;
+        --input: 0 0% 89.8%;
+        --ring: 0 0% 3.9%;
+        --radius: 0.5rem;
+
+        --esp-tools-button-color: hsl(var(--primary));
+        --esp-tools-button-text-color: hsl(var(--primary-foreground));
+        --esp-tools-button-border-radius: calc(var(--radius) - 2px);
       }}
 
-      body {{
-        color-scheme: light;
-        font-family: "Montserrat", sans-serif;
-      }}
+      body {{ color-scheme: light; font-family: "Inter", ui-sans-serif, system-ui, sans-serif; }}
 
       esp-web-install-button::part(button) {{
-        font-family: "Montserrat", sans-serif;
-        font-weight: 600;
-        letter-spacing: 0.01em;
+        font-family: "Inter", ui-sans-serif, system-ui, sans-serif;
+        font-weight: 500;
+        font-size: 0.875rem;
+        padding: 0.5rem 1rem;
+        line-height: 1.5rem;
       }}
+
+      /* native <progress> styled as a shadcn Progress bar */
+      progress.ui-progress {{ -webkit-appearance: none; appearance: none; border: 0; }}
+      progress.ui-progress::-webkit-progress-bar {{ background: hsl(var(--secondary)); border-radius: 9999px; }}
+      progress.ui-progress::-webkit-progress-value {{ background: hsl(var(--primary)); border-radius: 9999px; }}
+      progress.ui-progress::-moz-progress-bar {{ background: hsl(var(--primary)); border-radius: 9999px; }}
     </style>
   </head>
-  <body class="min-h-screen bg-gradient-to-b from-[#f4f4f1] to-paper-bg text-paper-text">
-    <main class="mx-auto w-[min(46rem,calc(100vw-2rem))] py-10 max-sm:pt-4 max-sm:pb-8 space-y-6">
-      <div class="px-7 max-sm:px-5">
-        <h1 class="text-[clamp(2rem,6vw,3.2rem)] font-bold leading-none">{PROJECT_NAME}</h1>
-        <p class="mt-2 text-paper-muted">Select a device to flash. <a class="text-paper-accent underline decoration-1 underline-offset-2" href="{safe_repo_url}">Repository</a></p>
+  <body class="min-h-screen bg-background text-foreground antialiased">
+    <main class="mx-auto w-[min(48rem,calc(100vw-2rem))] space-y-8 py-12 max-sm:py-8">
+      <header class="space-y-2">
+        <h1 class="text-3xl font-bold tracking-tight sm:text-4xl">{PROJECT_NAME}</h1>
+        <p class="text-muted-foreground">Pick your device, then flash it from the browser. <a class="font-medium text-primary underline-offset-4 hover:underline" href="{safe_repo_url}">Repository</a></p>
+      </header>
+      <div class="space-y-4">
+{tablist}
+{panels}
       </div>
-{cards}
-      <div class="px-7 max-sm:px-5">
-        <p class="text-sm leading-6 text-paper-muted">Use a USB data cable and Chrome or Edge on desktop. ESP32 boards (T5 ePaper, T-Deck) flash in-browser over Web Serial with ESP Web Tools; the nRF52 Wio Tracker L1 flashes over Web Serial too — double-tap RESET into the bootloader first, or fall back to copying its UF2 onto the bootloader drive.</p>
-        <ol class="list-decimal space-y-1 pl-5 text-sm leading-6 text-paper-muted mt-2">
+      <div class="{INSTR_PANEL}">
+        <p>Use a USB data cable and Chrome or Edge on desktop. ESP32 boards (T5 ePaper, T-Deck) flash in-browser over Web Serial with ESP Web Tools; the nRF52 Wio Tracker L1 flashes over Web Serial too — double-tap RESET into the bootloader first, or fall back to copying its UF2 onto the bootloader drive.</p>
+        <ol class="mt-2 list-decimal space-y-1 pl-5">
           <li>Put the board in bootloader mode if the browser cannot detect it.</li>
           <li>Choose erase when you want a clean install (ESP32 Web Serial only).</li>
         </ol>
       </div>
     </main>
+    <script>
+      (function () {{
+        var tabs = document.querySelectorAll("[data-tab]");
+        var panels = document.querySelectorAll("[data-panel]");
+        function activate(slug) {{
+          tabs.forEach(function (t) {{
+            t.setAttribute("data-state", t.dataset.tab === slug ? "active" : "inactive");
+          }});
+          panels.forEach(function (p) {{ p.hidden = p.dataset.panel !== slug; }});
+        }}
+        tabs.forEach(function (t) {{
+          t.addEventListener("click", function () {{ activate(t.dataset.tab); }});
+        }});
+      }})();
+    </script>
   </body>
 </html>
 """
