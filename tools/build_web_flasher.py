@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # /// script
 # requires-python = ">=3.9"
-# dependencies = []
+# dependencies = ["esptool"]
 # ///
 """Generate the unified MeshCore MeshUI web flasher page.
 
@@ -17,6 +17,7 @@ import html
 import json
 import shutil
 import subprocess
+import sys
 import zipfile
 from pathlib import Path
 from string import Template
@@ -338,7 +339,7 @@ def main() -> None:
 
             run(
                 [
-                    "python",
+                    sys.executable,
                     "-m",
                     "esptool",
                     "--chip",
