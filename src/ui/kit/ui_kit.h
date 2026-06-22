@@ -116,6 +116,17 @@ void   on_click(Handle h, Cb cb, void* user);  // make any widget tappable
 void   free_layout(Handle h);              // disable auto (flex) layout for absolute positioning
 void   focus_refresh();                    // re-scan focusable widgets after a rebuild
 
+// ---- modal text entry ------------------------------------------------------
+// An on-screen keyboard for free-text entry on panels without a physical
+// keyboard. Backend-specific: the mono panel draws an immediate-mode grid
+// navigated by the joystick (U/D/L/R move the cursor, press = key, back =
+// cancel); the LVGL panel overlays a touch keyboard on the top layer. The
+// callback fires once with the typed text on confirm, or nullptr on cancel,
+// after which the keyboard closes itself. Only one may be open at a time.
+typedef void (*TextCb)(const char* text, void* user);
+void keyboard_open(const char* initial, int max_len, TextCb cb, void* user);
+bool keyboard_active();
+
 // ---- timers ----------------------------------------------------------------
 // A periodic UI tick. Screens use this for their refresh cadence instead of
 // LVGL's lv_timer, so screen code stays backend-agnostic.

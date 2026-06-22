@@ -511,6 +511,146 @@ static void draw_toast() {
     draw_text(bx + 6, by + 4, g_toast, Font::Body, false);
 }
 
+// ---- modal on-screen keyboard ----------------------------------------------
+// Immediate-mode, ported from MeshCore-Solo's KeyboardWidget. A 4x10 character
+// grid (two pages: letters / symbols) plus a special row (caps, space, delete,
+// page toggle, OK). Navigated by the joystick: U/D/L/R move the cursor, press
+// activates the key, back cancels. Drawn directly in render()'s page loop and
+// fed keys ahead of the normal focus nav while active.
+static const int KB_PAGES   = 2;
+static const char KB_CHARS[KB_PAGES][4][10] = {
+    { {'a','b','c','d','e','f','g','h','i','j'},
+      {'k','l','m','n','o','p','q','r','s','t'},
+      {'u','v','w','x','y','z','.',',','!','?'},
+      {'1','2','3','4','5','6','7','8','9','0'} },
+    { {'@','#','&','*','(',')','-','_','+','='},
+      {'/','\\',':',';','\'','"','<','>','[',']'},
+      {'{','}','|','~','^','$','%','`',',','.'},
+      {'1','2','3','4','5','6','7','8','9','0'} },
+};
+static const int KB_COLS    = 10;
+static const int KB_CROWS   = 4;     // character rows
+static const int KB_SPECIAL = 5;     // caps · space · del · page · OK
+static const int KB_MAXBUF  = 160;
+
+static bool   g_kb_on = false;
+static char   g_kb_buf[KB_MAXBUF + 1];
+static int    g_kb_len = 0, g_kb_max = 0;
+static int    g_kb_row = 0, g_kb_col = 0;
+static int    g_kb_page = 0;
+static bool   g_kb_caps = false;
+static TextCb g_kb_cb = nullptr;
+static void*  g_kb_user = nullptr;
+
+bool kb_active() { return g_kb_on; }
+
+void kb_open(const char* initial, int max_len, TextCb cb, void* user) {
+    g_kb_max = (max_len > KB_MAXBUF || max_len <= 0) ? KB_MAXBUF : max_len;
+    g_kb_buf[0] = 0;
+    if (initial) { strncpy(g_kb_buf, initial, g_kb_max); g_kb_buf[g_kb_max] = 0; }
+    g_kb_len = strlen(g_kb_buf);
+    g_kb_row = g_kb_col = 0;
+    g_kb_page = 0;
+    g_kb_caps = false;
+    g_kb_cb = cb; g_kb_user = user;
+    g_kb_on = true;
+    g_dirty = true;
+    render();
+}
+
+static void kb_finish(const char* result) {
+    g_kb_on = false;
+    TextCb cb = g_kb_cb; void* user = g_kb_user;
+    g_kb_cb = nullptr; g_kb_user = nullptr;
+    if (cb) cb(result, user);     // may pop/navigate (which re-renders)
+    g_dirty = true;
+    render();                     // otherwise repaint the underlying screen
+}
+
+static int kb_maxcol() { return (g_kb_row >= KB_CROWS) ? KB_SPECIAL - 1 : KB_COLS - 1; }
+
+static void kb_activate() {
+    if (g_kb_row < KB_CROWS) {
+        if (g_kb_len < g_kb_max) {
+            char ch = KB_CHARS[g_kb_page][g_kb_row][g_kb_col];
+            if (g_kb_caps && ch >= 'a' && ch <= 'z') ch = ch - 'a' + 'A';
+            g_kb_buf[g_kb_len++] = ch;
+            g_kb_buf[g_kb_len] = 0;
+        }
+        return;
+    }
+    switch (g_kb_col) {
+        case 0: g_kb_caps = !g_kb_caps; break;
+        case 1: if (g_kb_len < g_kb_max) { g_kb_buf[g_kb_len++] = ' '; g_kb_buf[g_kb_len] = 0; } break;
+        case 2: if (g_kb_len > 0) g_kb_buf[--g_kb_len] = 0; break;
+        case 3: g_kb_page ^= 1; break;
+        case 4: kb_finish(g_kb_buf); return;   // OK — buf may be empty (treated as "")
+    }
+}
+
+// Returns true if the key was consumed by the keyboard.
+static bool kb_handle_key(char key) {
+    switch (key) {
+        case 'B': kb_finish(nullptr); return true;          // cancel
+        case 'U': g_kb_row = (g_kb_row > 0) ? g_kb_row - 1 : KB_CROWS; break;
+        case 'D': g_kb_row = (g_kb_row < KB_CROWS) ? g_kb_row + 1 : 0; break;
+        case 'L': { int m = kb_maxcol(); g_kb_col = (g_kb_col > 0) ? g_kb_col - 1 : m; break; }
+        case 'R': { int m = kb_maxcol(); g_kb_col = (g_kb_col < m) ? g_kb_col + 1 : 0; break; }
+        case 'E': case '\r': kb_activate(); break;
+        default: return true;
+    }
+    if (g_kb_col > kb_maxcol()) g_kb_col = kb_maxcol();     // clamp after a row change
+    g_dirty = true;
+    render();
+    return true;
+}
+
+static void kb_draw() {
+    const int W = display.width();
+    const int hh = header_h();
+    const int avail = display.height() - hh;
+    const int bands = KB_CROWS + 2;          // preview + 4 char rows + special row
+    const int bh = avail / bands;
+    const int top = hh;
+
+    // preview: tail of the typed text that fits, plus a cursor underscore
+    int cpl = (W / char_w(Font::Body)) - 1; if (cpl < 1) cpl = 1;
+    int from = (g_kb_len > cpl) ? g_kb_len - cpl : 0;
+    char prev[48];
+    snprintf(prev, sizeof(prev), "%s_", g_kb_buf + from);
+    draw_text(2, top + (bh - 8) / 2, prev, Font::Body, false);
+    display.drawFastHLine(0, top + bh - 1, W, cfg());
+
+    // character grid
+    const int cw = W / KB_COLS;
+    for (int r = 0; r < KB_CROWS; r++) {
+        int ry = top + bh + r * bh;
+        for (int c = 0; c < KB_COLS; c++) {
+            char ch = KB_CHARS[g_kb_page][r][c];
+            if (g_kb_caps && ch >= 'a' && ch <= 'z') ch = ch - 'a' + 'A';
+            bool sel = (g_kb_row == r && g_kb_col == c);
+            int cx = c * cw;
+            if (sel) display.fillRect(cx, ry, cw, bh, cfg());
+            char s[2] = { ch, 0 };
+            draw_text(cx + (cw - char_w(Font::Body)) / 2, ry + (bh - 8) / 2, s, Font::Body, sel);
+        }
+    }
+
+    // special row: caps · space · del · page · OK
+    static const char* SPEC[KB_SPECIAL] = { "Aa", "Spc", "Del", "#@", "OK" };
+    int sy = top + bh + KB_CROWS * bh;
+    int sw = W / KB_SPECIAL;
+    for (int i = 0; i < KB_SPECIAL; i++) {
+        const char* lbl = (i == 3) ? (g_kb_page == 0 ? "#@" : "abc") : SPEC[i];
+        bool sel = (g_kb_row == KB_CROWS && g_kb_col == i);
+        bool on  = (i == 0 && g_kb_caps);
+        int sx = i * sw;
+        if (sel || on) display.fillRect(sx, sy, sw, bh, cfg());
+        else           display.drawRect(sx, sy, sw, bh, cfg());
+        draw_text(sx + (sw - text_w(lbl, Font::Body)) / 2, sy + (bh - 8) / 2, lbl, Font::Body, sel || on);
+    }
+}
+
 void reset() {
     g_used = 0; g_focus = nullptr;
     g_root = alloc(K_CONT);
@@ -566,7 +706,8 @@ void render() {
     display.firstPage();
     do {
         display.fillScreen(cbg());
-        draw_node(g_root);
+        if (g_kb_on) kb_draw();
+        else         draw_node(g_root);
         if (g_sb_fn) {
             // Status bar on top — clear the band (in case content scrolled under
             // it), let the app paint it, then a separator line.
@@ -640,6 +781,7 @@ static int content_bottom(Node* n) {
 }
 
 void feed_key(char key) {
+    if (g_kb_on) { kb_handle_key(key); return; }   // modal keyboard eats all keys
     if (key == 'B') { back(); return; }
 
     Node* foc[POOL]; int cnt = 0;
@@ -683,6 +825,13 @@ void feed_key(char key) {
 }
 
 } // namespace mono
+
+// ---- modal text entry facade ----------------------------------------------
+void keyboard_open(const char* initial, int max_len, TextCb cb, void* user) {
+    mono::kb_open(initial, max_len, cb, user);
+}
+bool keyboard_active() { return mono::kb_active(); }
+
 } // namespace ui::kit
 
 #endif // BOARD_WIO_L1

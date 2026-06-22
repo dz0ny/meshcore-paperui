@@ -45,6 +45,11 @@ static const uint8_t BTN_UP    = 27;
 static const uint8_t BTN_DOWN  = 28;
 static const uint8_t BTN_PRESS = 29;
 static const uint8_t BTN_BACK  = 13;
+// The physical up/down axis (BUTTON2/3). Unused by the linear menu nav, but the
+// on-screen keyboard needs left/right. With the 90° panel rotation, physical
+// up = visual right and physical down = visual left. (Swap if reversed on yours.)
+static const uint8_t BTN_RIGHT = 25;
+static const uint8_t BTN_LEFT  = 26;
 
 // ---- feed the model from the mesh sensors / radio ---------------------------
 static void feed_model() {
@@ -281,6 +286,8 @@ struct Btn { uint8_t pin; char key; bool prev; uint32_t t; };
 static Btn g_btns[] = {
     { BTN_UP,    'U', false, 0 },
     { BTN_DOWN,  'D', false, 0 },
+    { BTN_LEFT,  'L', false, 0 },
+    { BTN_RIGHT, 'R', false, 0 },
     { BTN_PRESS, 'E', false, 0 },
     { BTN_BACK,  'B', false, 0 },
 };
@@ -290,7 +297,11 @@ static void poll_buttons() {
         bool down = (digitalRead(b.pin) == LOW);
         if (down && !b.prev && (now - b.t) > 150) {
             b.t = now;
-            if (ui::screen_mgr::top_id() == SCREEN_DASH)
+            // The on-screen keyboard is modal: it consumes every key (incl. L/R
+            // and back-as-cancel) until it closes itself.
+            if (ui::kit::keyboard_active())
+                mono::feed_key(b.key);
+            else if (ui::screen_mgr::top_id() == SCREEN_DASH)
                 ui::screen_mgr::push(SCREEN_HOME, true);   // any button leaves the dashboard for the menu
             else if (ui::screen_mgr::top_id() == SCREEN_PROVISION_RUN ||
                      ui::screen_mgr::top_id() == SCREEN_PROVISION_PICK) {

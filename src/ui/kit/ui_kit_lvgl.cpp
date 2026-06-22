@@ -341,6 +341,85 @@ void stop(Timer t) {
 // lv_async_cb_t is already void(*)(void*) — same shape as kit::Cb.
 void defer(Cb cb, void* user) { lv_async_call((lv_async_cb_t)cb, user); }
 
+// ---- modal text entry ------------------------------------------------------
+// A top-layer overlay with a textarea + lv_keyboard. The keyboard's built-in OK
+// key fires LV_EVENT_READY (confirm) and its close key fires LV_EVENT_CANCEL.
+// Teardown is deferred (lv_async) so we never delete the modal from inside its
+// own child's event handler.
+static lv_obj_t* g_kb_modal   = nullptr;
+static lv_obj_t* g_kb_ta      = nullptr;
+static TextCb    g_kb_cb      = nullptr;
+static void*     g_kb_user    = nullptr;
+static char      g_kb_result[161];
+static bool      g_kb_ok      = false;
+static bool      g_kb_closing = false;
+
+static void kb_do_close(void*) {
+    lv_obj_t* m = g_kb_modal;
+    g_kb_modal = nullptr; g_kb_ta = nullptr;
+    if (m) lv_obj_delete(m);
+    TextCb cb = g_kb_cb; void* user = g_kb_user;
+    g_kb_cb = nullptr; g_kb_user = nullptr; g_kb_closing = false;
+    if (cb) cb(g_kb_ok ? g_kb_result : nullptr, user);
+}
+
+static void kb_event(lv_event_t* e) {
+    lv_event_code_t code = lv_event_get_code(e);
+    if (code != LV_EVENT_READY && code != LV_EVENT_CANCEL) return;
+    if (g_kb_closing) return;
+    g_kb_closing = true;
+    g_kb_ok = (code == LV_EVENT_READY);
+    if (g_kb_ok && g_kb_ta) {
+        const char* t = lv_textarea_get_text(g_kb_ta);
+        strncpy(g_kb_result, t ? t : "", sizeof(g_kb_result) - 1);
+        g_kb_result[sizeof(g_kb_result) - 1] = 0;
+    }
+    lv_async_call(kb_do_close, nullptr);
+}
+
+void keyboard_open(const char* initial, int max_len, TextCb cb, void* user) {
+    if (g_kb_modal) return;   // one at a time
+    g_kb_cb = cb; g_kb_user = user; g_kb_ok = false; g_kb_closing = false;
+
+    g_kb_modal = lv_obj_create(lv_layer_top());
+    lv_obj_set_size(g_kb_modal, lv_pct(100), lv_pct(100));
+    lv_obj_set_style_bg_color(g_kb_modal, lv_color_hex(EPD_COLOR_BG), LV_PART_MAIN);
+    lv_obj_set_style_bg_opa(g_kb_modal, LV_OPA_COVER, LV_PART_MAIN);
+    lv_obj_set_style_pad_all(g_kb_modal, 0, LV_PART_MAIN);
+    lv_obj_clear_flag(g_kb_modal, LV_OBJ_FLAG_SCROLLABLE);
+
+    g_kb_ta = lv_textarea_create(g_kb_modal);
+    lv_obj_set_size(g_kb_ta, lv_pct(100), lv_pct(40));
+    lv_obj_align(g_kb_ta, LV_ALIGN_TOP_MID, 0, 0);
+    lv_textarea_set_max_length(g_kb_ta, max_len > 0 ? max_len : 150);
+    lv_textarea_set_one_line(g_kb_ta, false);
+    if (initial) lv_textarea_set_text(g_kb_ta, initial);
+    lv_obj_set_style_text_font(g_kb_ta, UI_FONT_BODY, LV_PART_MAIN);
+    lv_obj_set_style_text_color(g_kb_ta, lv_color_hex(EPD_COLOR_TEXT), LV_PART_MAIN);
+    lv_obj_set_style_anim_duration(g_kb_ta, 0, LV_PART_CURSOR);
+
+#if LV_USE_KEYBOARD
+    // Touch panels (T5 ePaper): draw an on-screen keyboard. Its OK/close keys
+    // fire READY/CANCEL.
+    lv_obj_t* kb = lv_keyboard_create(g_kb_modal);
+    lv_obj_set_size(kb, lv_pct(100), lv_pct(58));
+    lv_obj_align(kb, LV_ALIGN_BOTTOM_MID, 0, 0);
+    lv_keyboard_set_textarea(kb, g_kb_ta);
+    lv_obj_set_style_text_font(kb, UI_FONT_TITLE, LV_PART_MAIN);
+    lv_obj_set_style_anim_duration(kb, 0, LV_PART_MAIN);
+    lv_obj_add_event_cb(kb, kb_event, LV_EVENT_ALL, nullptr);
+#else
+    // Physical-keyboard panels (T-Deck): no on-screen keyboard widget. The
+    // textarea takes hardware key input; Enter confirms (READY), Esc cancels.
+    lv_textarea_set_one_line(g_kb_ta, true);
+    lv_obj_add_event_cb(g_kb_ta, kb_event, LV_EVENT_ALL, nullptr);
+    lv_group_t* grp = lv_group_get_default();
+    if (grp) lv_group_focus_obj(g_kb_ta);
+#endif
+}
+
+bool keyboard_active() { return g_kb_modal != nullptr; }
+
 } // namespace ui::kit
 
 #endif // !BOARD_WIO_L1

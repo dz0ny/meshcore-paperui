@@ -52,6 +52,16 @@ static void send_quick(const char* text) {
     ui::screen_mgr::pop(true);   // back to chat — rebuild shows the echoed message
 }
 
+// Free-text entry via the on-screen keyboard. Fires once with the typed text
+// (or nullptr if cancelled); a non-empty message is sent like any quick reply.
+static void on_typed(const char* text, void*) {
+    if (text && text[0]) send_quick(text);
+}
+
+static void on_type_msg(void*) {
+    ui::kit::keyboard_open("", 150, on_typed, nullptr);
+}
+
 static void on_gps_loc(void*) {
     if (!model::gps.has_fix) {
         ui::toast::show(i18n::t(i18n::T_NO_GPS_FIX));
@@ -70,6 +80,7 @@ static void on_phrase(void* user) {
 
 static void create(Handle parent) {
     Handle lst = list(parent);
+    menu_row(lst, "Type message", on_type_msg, nullptr);
     menu_row(lst, i18n::t(i18n::T_QR_GPS_LOC), on_gps_loc, nullptr);
     for (int i = 0; i < n_phrases; i++) {
         menu_row(lst, i18n::t(phrase_ids[i]), on_phrase, (void*)(intptr_t)i);
