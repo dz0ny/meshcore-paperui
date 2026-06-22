@@ -5,6 +5,7 @@
 #include "../ui_theme.h"          // SCREEN_* ids + UI_HOME_* layout
 #include "../ui_screen_mgr.h"
 #include "../kit/ui_kit.h"
+#include "../i18n.h"
 #include "../../model.h"
 #include "../../board.h"
 
@@ -89,7 +90,7 @@ static void create(Handle parent) {
     menu_row(menu, "Sensors",  on_sensors_click,  nullptr);
     menu_row(menu, "Map",      on_map_click,      nullptr);
     menu_row(menu, "Trail",    on_trail_click,    nullptr);
-    menu_row(menu, "Waypoints", on_waypoints_click, nullptr);
+    menu_row(menu, i18n::t(i18n::T_WAYPOINTS), on_waypoints_click, nullptr);
     menu_row(menu, "Settings", on_settings_click, nullptr);
 }
 

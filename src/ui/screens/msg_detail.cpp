@@ -5,6 +5,7 @@
 #include "../ui_screen_mgr.h"
 #include "../kit/ui_kit.h"
 #include "../components/toast.h"
+#include "../i18n.h"
 #include "../../model.h"
 #include "../../waypoint_store.h"
 #include "../../sd_log.h"
@@ -39,10 +40,10 @@ static void on_navigate(void*) {
 
 static void on_save(void*) {
     if (!has_loc) return;
-    if (model::waypoints.full()) { ui::toast::show("Waypoints full"); return; }
+    if (model::waypoints.full()) { ui::toast::show(i18n::t(i18n::T_WAYPOINTS_FULL)); return; }
     bool ok = model::waypoints.add(loc_lat_e6, loc_lon_e6, model::epoch_now,
                                    loc_label[0] ? loc_label : nullptr);
-    ui::toast::show(ok ? "Saved to waypoints" : "Waypoints full");
+    ui::toast::show(i18n::t(ok ? i18n::T_SAVED_WAYPOINT : i18n::T_WAYPOINTS_FULL));
 }
 
 static void on_delete(void*) {
@@ -83,10 +84,10 @@ static void create(Handle parent) {
         Handle loc_actions = row(content);
         size(loc_actions, pct(100), UI_TEXT_BTN_HEIGHT);
         gap(loc_actions, UI_MENU_ITEM_PAD);
-        Handle nav_btn = button(loc_actions, "Navigate", on_navigate, nullptr);
+        Handle nav_btn = button(loc_actions, i18n::t(i18n::T_NAVIGATE), on_navigate, nullptr);
         size(nav_btn, pct(50), UI_TEXT_BTN_HEIGHT);
         grow(nav_btn, 1);
-        Handle save_btn = button(loc_actions, "Save", on_save, nullptr);
+        Handle save_btn = button(loc_actions, i18n::t(i18n::T_SAVE), on_save, nullptr);
         size(save_btn, pct(50), UI_TEXT_BTN_HEIGHT);
         grow(save_btn, 1);
     }
@@ -96,11 +97,11 @@ static void create(Handle parent) {
     gap(actions, UI_MENU_ITEM_PAD);
 
     if (!msg.is_self) {
-        Handle reply_btn = button(actions, "Reply", on_reply, nullptr);
+        Handle reply_btn = button(actions, i18n::t(i18n::T_REPLY), on_reply, nullptr);
         size(reply_btn, pct(50), UI_TEXT_BTN_HEIGHT);
         grow(reply_btn, 1);
     }
-    Handle del_btn = button(actions, "Delete", on_delete, nullptr);
+    Handle del_btn = button(actions, i18n::t(i18n::T_DELETE), on_delete, nullptr);
     size(del_btn, pct(msg.is_self ? 100 : 50), UI_TEXT_BTN_HEIGHT);
     grow(del_btn, 1);
 }

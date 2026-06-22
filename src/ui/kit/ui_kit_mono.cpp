@@ -40,6 +40,7 @@ struct Node {
     Align align; int dx, dy;  // for absolute (free_layout) children
 
     bool  hidden, clickable, focusable_, card, center;
+    bool  bar;                // inverted full-width header bar (Solo sender style)
     Font  font;
     char  text[40];
     Cb    cb; void* user;
@@ -255,21 +256,22 @@ void canvas_flush(Handle) {}   // drawn during render()
 // ---- message list (minimal: a vertical stack of "sender: text" lines) ------
 Handle msglist(Handle parent) { Node* n = alloc(K_CONT); n->lay = L_COL; n->w_spec = pct(100); n->pad = 2; add_child(N(parent), n); return (Handle)n; }
 void   msg_append(Handle l, const char* sender, const char* text, bool is_self, int) {
-    // Sender as a small header line on top, then the message body word-wrapped
-    // full-width below in the 1x font. No inline "sender:"/channel prefix, and a
-    // small font so more fits on the 250px mono screen.
+    // Sender as a 1x inverted header bar, then the message body word-wrapped
+    // below in the 2x font. The big body is the readable content; the small bar
+    // just labels it. (Small and Body are both 1x on mono — Title is the 2x.)
     const char* who = is_self ? "me" : (sender && sender[0] ? sender : "?");
-    char hdr[40];
-    snprintf(hdr, sizeof(hdr), "%s:", who);
-    Handle h = label(l, hdr);
+    Handle h = label(l, who);
     N(h)->font = Font::Small;
+    N(h)->bar = true;              // Solo-style inverted sender header bar
+    N(h)->w_spec = pct(100);       // span the list so the bar runs full width
 
     const char* body = text ? text : "";
     int len = (int)strlen(body);
     if (len == 0) return;
 
+    const Font body_font = Font::Title;            // 2x — fills the panel, e-ink readable
     const int CAP = (int)sizeof(N(h)->text) - 1;   // label text buffer (39 usable)
-    int maxc = (display.width() - 4) / char_w(Font::Body);
+    int maxc = (display.width() - 4) / char_w(body_font);
     if (maxc > CAP) maxc = CAP;
     if (maxc < 1) maxc = 1;
 
@@ -288,7 +290,7 @@ void   msg_append(Handle l, const char* sender, const char* text, bool is_self, 
         memcpy(seg, body + pos, take);
         seg[take] = 0;
         Handle row = label(l, seg);
-        N(row)->font = Font::Body;
+        N(row)->font = body_font;
         pos += take;
         while (pos < len && body[pos] == ' ') pos++;   // swallow the wrapped space
     }
@@ -459,6 +461,12 @@ static void draw_node(Node* n) {
         bool inv = false;
         // inverted text when the enclosing clickable row is focused
         for (Node* a = n->parent; a; a = a->parent) if (a == g_focus) { inv = true; break; }
+        // Solo-style sender bar: fill the full row in ink, draw the text reversed.
+        if (n->bar && !inv) {
+            display.fillRect(n->x, sy, n->w, n->h, cfg());
+            draw_text(n->x + 2, sy, n->text, n->font, true);
+            return;
+        }
         draw_text(n->x, sy, n->text, n->font, inv);
         return;
     }

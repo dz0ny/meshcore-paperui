@@ -2,6 +2,7 @@
 #include "ui_port.h"
 #include "ui_theme.h"
 #include "components/nav_button.h"
+#include "i18n.h"
 #include <cstring>
 
 // Ported from factory scr_mrg.cpp — kept as C-style linked list, works well.
@@ -81,8 +82,8 @@ static const char* default_nav_title(int id) {
         case SCREEN_TRAIL: return "Trail";
         case SCREEN_TEAM: return "Team";
         case SCREEN_COMPASS: return "Compass";
-        case SCREEN_WAYPOINTS: return "Waypoints";
-        case SCREEN_WAYPOINT_DETAIL: return "Waypoint";
+        case SCREEN_WAYPOINTS: return i18n::t(i18n::T_WAYPOINTS);
+        case SCREEN_WAYPOINT_DETAIL: return i18n::t(i18n::T_WAYPOINTS);
         default: return "";
     }
 }

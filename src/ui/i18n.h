@@ -44,7 +44,7 @@ enum Str : uint16_t {
     T_NO_MESSAGES, T_MSG_CHANNEL, T_GPS_CHANNEL, T_UNREAD,
     // quick replies
     T_REPLY, T_SENT, T_SEND_FAILED, T_NO_GPS_FIX, T_QR_GPS_LOC,
-    T_QR_OMW, T_QR_YES, T_QR_NO, T_QR_HELP, T_QR_ARRIVED,
+    T_QR_OMW, T_QR_YES, T_QR_NO, T_QR_HELP, T_QR_ARRIVED, T_QR_TYPE_MSG,
     // map / compass
     T_MAP, T_NO_LOCATIONS, T_MOVE_TO_CAL,
     // time
@@ -54,6 +54,9 @@ enum Str : uint16_t {
     T_PROV_WAIT, T_PROV_SEARCH, T_PROV_TRANSFER, T_PROV_DONE, T_PROV_FAILED, T_PROV_SELECT,
     // self-advert (announce this node on the mesh)
     T_ADVERT_ZEROHOP, T_ADVERT_FLOOD, T_ADVERT_SENT,
+    // waypoints + shared location
+    T_WAYPOINTS, T_MARK_HERE, T_NO_WAYPOINTS, T_NAVIGATE, T_SEND, T_SAVE, T_DELETE,
+    T_WAYPOINTS_FULL, T_WAYPOINT_MARKED, T_WAYPOINT_SENT, T_WAYPOINT_DELETED, T_SAVED_WAYPOINT,
     // language names (always shown in their own language)
     T_LANG_EN, T_LANG_SL,
     T_COUNT
@@ -80,12 +83,14 @@ inline const char* t(Str id) {
         "Trail cleared",
         "No messages yet", "Channel", "GPS Chan", "unread",
         "Reply", "Sent", "Send failed", "No GPS fix", "GPS location",
-        "On my way", "Yes", "No", "Need help", "Arrived",
+        "On my way", "Yes", "No", "Need help", "Arrived", "Type message",
         "Map", "No positions yet", "Move to calibrate",
         "Time zone",
         "Provision", "Share Profile", "Receive Profile",
         "Waiting for receiver", "Searching...", "Transferring", "Done", "Failed", "Select device",
         "Advert (direct)", "Advert (flood)", "Advert sent",
+        "Waypoints", "+ Mark here", "No waypoints yet", "Navigate", "Send", "Save", "Delete",
+        "Waypoints full", "Waypoint marked", "Waypoint sent", "Waypoint deleted", "Saved to waypoints",
         "English", "Slovensko",
     };
     static const char* const SL_T[T_COUNT] = {
@@ -103,12 +108,14 @@ inline const char* t(Str id) {
         "Sled pociscena",
         "Ni sporocil", "Kanal", "GPS kanal", "neprebranih",
         "Odgovori", "Poslano", "Posiljanje ni uspelo", "Ni GPS fix", "GPS lokacija",
-        "Ze grem", "Da", "Ne", "Rabim pomoc", "Prispel",
+        "Ze grem", "Da", "Ne", "Rabim pomoc", "Prispel", "Napisi sporocilo",
         "Zemljevid", "Ni lokacij", "Premakni za kalib.",
         "Casovni pas",
         "Prenos nastav.", "Deli profil", "Prejmi profil",
         "Cakam prejemnika", "Iscem...", "Prenasam", "Koncano", "Napaka", "Izberi napravo",
         "Oglas (direkt)", "Oglas (poplava)", "Oglas poslan",
+        "Tocke", "+ Oznaci tukaj", "Ni tock", "Navigiraj", "Poslji", "Shrani", "Izbrisi",
+        "Tocke polne", "Tocka oznacena", "Tocka poslana", "Tocka izbrisana", "Shranjeno med tocke",
         "English", "Slovensko",
     };
     if (id >= T_COUNT) return "";

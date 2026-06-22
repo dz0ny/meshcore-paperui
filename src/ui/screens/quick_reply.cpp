@@ -80,7 +80,7 @@ static void on_phrase(void* user) {
 
 static void create(Handle parent) {
     Handle lst = list(parent);
-    menu_row(lst, "Type message", on_type_msg, nullptr);
+    menu_row(lst, i18n::t(i18n::T_QR_TYPE_MSG), on_type_msg, nullptr);
     menu_row(lst, i18n::t(i18n::T_QR_GPS_LOC), on_gps_loc, nullptr);
     for (int i = 0; i < n_phrases; i++) {
         menu_row(lst, i18n::t(phrase_ids[i]), on_phrase, (void*)(intptr_t)i);

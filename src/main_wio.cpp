@@ -222,7 +222,7 @@ static void home_create(Handle root) {
     if (model::team_count() > 0)
         menu_row(lst, i18n::t(i18n::T_TEAM), home_team, nullptr);
     menu_row(lst, i18n::t(i18n::T_TRAIL),    home_trail,    nullptr);
-    menu_row(lst, "Waypoints",               home_waypoints, nullptr);
+    menu_row(lst, i18n::t(i18n::T_WAYPOINTS), home_waypoints, nullptr);
     // GPS / Mesh / Battery live under Status (it already lists their info pages).
     menu_row(lst, i18n::t(i18n::T_STATUS),   home_status,   nullptr);
     menu_row(lst, i18n::t(i18n::T_SETTINGS), home_settings, nullptr);

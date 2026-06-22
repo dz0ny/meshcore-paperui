@@ -6,6 +6,7 @@
 #include "../ui_screen_mgr.h"
 #include "../kit/ui_kit.h"
 #include "../components/toast.h"
+#include "../i18n.h"
 #include "../../model.h"
 #include "../../waypoint_store.h"
 #include "../../mesh/mesh_task.h"
@@ -49,7 +50,7 @@ static void on_send(void*) {
 #else
     bool ok = mesh::task::send_public(msg);   // ESP32 build has no active-channel concept
 #endif
-    ui::toast::show(ok ? "Waypoint sent" : "Send failed");
+    ui::toast::show(i18n::t(ok ? i18n::T_WAYPOINT_SENT : i18n::T_SEND_FAILED));
 }
 
 static void on_delete(void*) {
@@ -57,7 +58,7 @@ static void on_delete(void*) {
     wp_idx = -1;
     ui::screen_mgr::pop(true);
     ui::screen_mgr::reload_stack();   // rebuild the list without the deleted row
-    ui::toast::show("Waypoint deleted");
+    ui::toast::show(i18n::t(i18n::T_WAYPOINT_DELETED));
 }
 
 static void create(Handle parent) {
@@ -76,11 +77,11 @@ static void create(Handle parent) {
     Handle spacer = label(content, "");
     grow(spacer, 1);   // push the buttons to the bottom
 
-    Handle b_nav = button(content, "Navigate", on_navigate, nullptr);
+    Handle b_nav = button(content, i18n::t(i18n::T_NAVIGATE), on_navigate, nullptr);
     size(b_nav, pct(100), WPD_BTN_H);
-    Handle b_send = button(content, "Send", on_send, nullptr);
+    Handle b_send = button(content, i18n::t(i18n::T_SEND), on_send, nullptr);
     size(b_send, pct(100), WPD_BTN_H);
-    Handle b_del = button(content, "Delete", on_delete, nullptr);
+    Handle b_del = button(content, i18n::t(i18n::T_DELETE), on_delete, nullptr);
     size(b_del, pct(100), WPD_BTN_H);
 }
 

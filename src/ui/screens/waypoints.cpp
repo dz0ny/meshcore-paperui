@@ -5,6 +5,7 @@
 #include "../ui_screen_mgr.h"
 #include "../kit/ui_kit.h"
 #include "../components/toast.h"
+#include "../i18n.h"
 #include "../../model.h"
 #include "../../waypoint_store.h"
 // Arduino.h's DEG_TO_RAD macro would clobber ui::geo's; drop it first.
@@ -20,12 +21,12 @@ namespace ui::screen::waypoints {
 using namespace ui::kit;
 
 static void on_mark_here(void*) {
-    if (!model::gps.has_fix) { ui::toast::show("No GPS fix"); return; }
-    if (model::waypoints.full()) { ui::toast::show("Waypoints full"); return; }
+    if (!model::gps.has_fix) { ui::toast::show(i18n::t(i18n::T_NO_GPS_FIX)); return; }
+    if (model::waypoints.full()) { ui::toast::show(i18n::t(i18n::T_WAYPOINTS_FULL)); return; }
     bool ok = model::waypoints.add((int32_t)(model::gps.lat * 1e6),
                                    (int32_t)(model::gps.lng * 1e6),
                                    model::epoch_now, nullptr);
-    ui::toast::show(ok ? "Waypoint marked" : "Waypoints full");
+    ui::toast::show(i18n::t(ok ? i18n::T_WAYPOINT_MARKED : i18n::T_WAYPOINTS_FULL));
     ui::screen_mgr::reload_stack();   // rebuild so the new row appears
 }
 
@@ -39,11 +40,13 @@ static void create(Handle parent) {
     Handle lst = list(parent);
     gap(lst, 2);
 
-    menu_row(lst, "+ Mark here", on_mark_here, nullptr);
+    menu_row(lst, i18n::t(i18n::T_MARK_HERE), on_mark_here, nullptr);
 
     int n = model::waypoints.count();
     if (n == 0) {
-        Handle empty = label(lst, "\n\n\nNo waypoints yet");
+        char emptybuf[40];
+        snprintf(emptybuf, sizeof(emptybuf), "\n\n\n%s", i18n::t(i18n::T_NO_WAYPOINTS));
+        Handle empty = label(lst, emptybuf);
         size(empty, pct(100), CONTENT);
         grow(empty, 1);
         font(empty, Font::Title);
