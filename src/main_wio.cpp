@@ -315,7 +315,9 @@ static void dash_destroy() { dash_gpsbatt = dash_clock = dash_unread = nullptr; 
 static screen_lifecycle_t dash_life = { dash_create, dash_entry, dash_exit, dash_destroy };
 
 // ---- joystick ---------------------------------------------------------------
-struct Btn { uint8_t pin; char key; bool prev; uint32_t t; };
+// held  = we've already fired for the current press and are waiting for release.
+// rel_t = first time the line was seen released while held (for release debounce).
+struct Btn { uint8_t pin; char key; bool held; uint32_t rel_t; };
 static Btn g_btns[] = {
     { BTN_UP,    'U', false, 0 },
     { BTN_DOWN,  'D', false, 0 },
@@ -326,23 +328,36 @@ static Btn g_btns[] = {
 };
 static const int N_BTN = sizeof(g_btns) / sizeof(g_btns[0]);
 
-// A press edge sets the matching latch from an ISR, so taps that land while the
-// loop is blocked in an e-ink redraw (compass/trail timers, clock, mesh, etc.)
-// are still registered instead of silently dropped. attachInterrupt() takes an
-// argless handler, so there's one tiny ISR per button.
-//
-// The ISR also debounces: contact bounce fires several FALLING edges per press,
-// and a redraw can block the loop longer than a poll-side time window, so a
-// leftover bounce latch would fire a *second* time after the redraw. Collapsing
-// edges within BTN_BOUNCE_MS in the ISR keeps one press == one latch.
-static const uint32_t BTN_BOUNCE_MS = 60;
-static volatile bool     g_latch[N_BTN] = {};
-static volatile uint32_t g_latch_t[N_BTN] = {};
-#define BTN_ISR(i) static void isr_btn##i() { \
-    uint32_t t = millis(); \
-    if (t - g_latch_t[i] >= BTN_BOUNCE_MS) { g_latch_t[i] = t; g_latch[i] = true; } }
+// A press edge sets the matching latch from an ISR, so a quick tap that happens
+// entirely while the loop is blocked in an e-ink redraw (compass/trail timers,
+// clock, mesh, etc.) — pressed and released before any poll — is still seen
+// instead of silently dropped. attachInterrupt() takes an argless handler, so
+// there's one tiny ISR per button; it does nothing but set the latch.
+static volatile bool g_latch[N_BTN] = {};
+#define BTN_ISR(i) static void isr_btn##i() { g_latch[i] = true; }
 BTN_ISR(0) BTN_ISR(1) BTN_ISR(2) BTN_ISR(3) BTN_ISR(4) BTN_ISR(5)
 static void (*const g_isr[N_BTN])() = { isr_btn0, isr_btn1, isr_btn2, isr_btn3, isr_btn4, isr_btn5 };
+
+// Line must read released continuously for this long before a button re-arms.
+// This is the only debounce: it gates re-firing, so contact bounce, a held
+// button, and a stale post-redraw latch can never produce a second press.
+static const uint32_t BTN_RELEASE_MS = 25;
+
+static void dispatch_key(char key) {
+    // The on-screen keyboard is modal: it consumes every key (incl. L/R and
+    // back-as-cancel) until it closes itself.
+    if (ui::kit::keyboard_active())
+        mono::feed_key(key);
+    else if (ui::screen_mgr::top_id() == SCREEN_DASH)
+        ui::screen_mgr::push(SCREEN_HOME, true);   // any button leaves the dashboard for the menu
+    else if (ui::screen_mgr::top_id() == SCREEN_PROVISION_RUN ||
+             ui::screen_mgr::top_id() == SCREEN_PROVISION_PICK) {
+        if (key == 'B') provision::reboot();        // abort provisioning → normal boot
+        else            mono::feed_key(key);        // navigate the device picker (no-op on run)
+    }
+    else if (key == 'B') ui::screen_mgr::pop(false);
+    else                 mono::feed_key(key);
+}
 
 static void poll_buttons() {
     uint32_t now = millis();
@@ -353,25 +368,26 @@ static void poll_buttons() {
         noInterrupts();
         if (g_latch[i]) { g_latch[i] = false; latched = true; }
         interrupts();
-        // The ISR latch is already debounced, so fire it as-is. The live-edge path
-        // is only a fallback for a missed interrupt and keeps its own time window.
-        if (latched || ((down && !b.prev) && (now - b.t) > 150)) {
-            b.t = now;
-            // The on-screen keyboard is modal: it consumes every key (incl. L/R
-            // and back-as-cancel) until it closes itself.
-            if (ui::kit::keyboard_active())
-                mono::feed_key(b.key);
-            else if (ui::screen_mgr::top_id() == SCREEN_DASH)
-                ui::screen_mgr::push(SCREEN_HOME, true);   // any button leaves the dashboard for the menu
-            else if (ui::screen_mgr::top_id() == SCREEN_PROVISION_RUN ||
-                     ui::screen_mgr::top_id() == SCREEN_PROVISION_PICK) {
-                if (b.key == 'B') provision::reboot();     // abort provisioning → normal boot
-                else              mono::feed_key(b.key);    // navigate the device picker (no-op on run)
+
+        if (!b.held) {
+            // Armed. Fire on the first press we observe — the line is down now, or
+            // the ISR caught a press that came and went during a blocking redraw.
+            if (down || latched) {
+                b.held = true;
+                b.rel_t = 0;
+                dispatch_key(b.key);
             }
-            else if (b.key == 'B') ui::screen_mgr::pop(false);
-            else                   mono::feed_key(b.key);
+        } else {
+            // Pressed: ignore everything (bounce, repeats, stale latches) until the
+            // line has been stably released for BTN_RELEASE_MS, then re-arm.
+            if (down) {
+                b.rel_t = 0;                         // still held — reset the release timer
+            } else if (b.rel_t == 0) {
+                b.rel_t = now ? now : 1;             // first release sighting (avoid 0 sentinel)
+            } else if ((now - b.rel_t) >= BTN_RELEASE_MS) {
+                b.held = false;                      // stable release → ready for the next press
+            }
         }
-        b.prev = down;
     }
 }
 
