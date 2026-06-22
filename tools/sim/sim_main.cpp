@@ -66,14 +66,17 @@ static void draw_statusbar(int w, int h) {
 // Some screens early-return unless a selection was set first; the builder seeds
 // that here so they have something to draw.
 namespace ui { namespace screen { namespace waypoint_detail { void set_index(int); } } }
+namespace ui { namespace screen { namespace compass { void set_target_pos(const char*, int32_t, int32_t); } } }
 
 struct Entry { const char* name; screen_lifecycle_t* life; void (*pre)(); };
 #define S(ns) { #ns, &ui::screen::ns::lifecycle, nullptr }
 static void pre_waypoint_detail() { ui::screen::waypoint_detail::set_index(0); }
+static void pre_compass() { ui::screen::compass::set_target_pos("Koca", 46070000, 14520000); }
 static const Entry SCREENS[] = {
     S(chat), S(quick_reply), S(status), S(settings), S(gps), S(mesh_settings),
     S(set_gps), S(set_mesh), S(set_display), S(set_sound), S(set_privacy), S(set_ble),
-    S(compass), S(trail), S(battery), S(team), S(waypoints),
+    { "compass", &ui::screen::compass::lifecycle, pre_compass },
+    S(trail), S(battery), S(team), S(waypoints),
     { "waypoint_detail", &ui::screen::waypoint_detail::lifecycle, pre_waypoint_detail },
     S(provision),
     { "keyboard", nullptr, nullptr },   // on-screen keyboard modal (synthetic)

@@ -707,47 +707,48 @@ static void kb_draw() {
     const int W = display.width();
     const int hh = header_h();
     const int avail = display.height() - hh;
-    const int bands = KB_CROWS + 2;          // preview + 4 char rows + special row
-    const int bh = avail / bands;
     const int top = hh;
 
+    // The 2x preview gets its own taller band so its glyphs (and descenders)
+    // clear the separator; the rest splits evenly across 4 char rows + special.
+    const int pvh = line_h(Font::Title) + 4;
+    const int rh  = (avail - pvh) / (KB_CROWS + 1);
+
     // preview: tail of the typed text that fits, plus a cursor underscore.
-    // Drawn in the 2x font so the in-progress message is actually readable.
     int cpl = (W / char_w(Font::Title)) - 1; if (cpl < 1) cpl = 1;
     int from = (g_kb_len > cpl) ? g_kb_len - cpl : 0;
     char prev[48];
     snprintf(prev, sizeof(prev), "%s_", g_kb_buf + from);
-    int pvy = top + (bh - 16) / 2; if (pvy < top) pvy = top;
-    draw_text(2, pvy, prev, Font::Title, false);
-    display.drawFastHLine(0, top + bh - 1, W, cfg());
+    draw_text(2, top + 2, prev, Font::Title, false);
+    display.drawFastHLine(0, top + pvh - 1, W, cfg());
 
     // character grid
     const int cw = W / KB_COLS;
     for (int r = 0; r < KB_CROWS; r++) {
-        int ry = top + bh + r * bh;
+        int ry = top + pvh + r * rh;
         for (int c = 0; c < KB_COLS; c++) {
             char ch = KB_CHARS[g_kb_page][r][c];
             if (g_kb_caps && ch >= 'a' && ch <= 'z') ch = ch - 'a' + 'A';
             bool sel = (g_kb_row == r && g_kb_col == c);
             int cx = c * cw;
-            if (sel) display.fillRect(cx, ry, cw, bh, cfg());
+            if (sel) display.fillRect(cx, ry, cw, rh, cfg());
             char s[2] = { ch, 0 };
-            draw_text(cx + (cw - char_w(Font::Body)) / 2, ry + (bh - 8) / 2, s, Font::Body, sel);
+            draw_text(cx + (cw - char_w(Font::Body)) / 2, ry + (rh - 8) / 2, s, Font::Body, sel);
         }
     }
 
     // special row: caps · space · del · page · OK
     static const char* SPEC[KB_SPECIAL] = { "Aa", "Spc", "Del", "#@", "OK" };
-    int sy = top + bh + KB_CROWS * bh;
+    int sy = top + pvh + KB_CROWS * rh;
     int sw = W / KB_SPECIAL;
     for (int i = 0; i < KB_SPECIAL; i++) {
         const char* lbl = (i == 3) ? (g_kb_page == 0 ? "#@" : "abc") : SPEC[i];
         bool sel = (g_kb_row == KB_CROWS && g_kb_col == i);
         bool on  = (i == 0 && g_kb_caps);
         int sx = i * sw;
-        if (sel || on) display.fillRect(sx, sy, sw, bh, cfg());
-        else           display.drawRect(sx, sy, sw, bh, cfg());
-        draw_text(sx + (sw - text_w(lbl, Font::Body)) / 2, sy + (bh - 8) / 2, lbl, Font::Body, sel || on);
+        if (sel || on) display.fillRect(sx, sy, sw, rh, cfg());
+        else           display.drawRect(sx, sy, sw, rh, cfg());
+        draw_text(sx + (sw - text_w(lbl, Font::Body)) / 2, sy + (rh - 8) / 2, lbl, Font::Body, sel || on);
     }
 }
 
