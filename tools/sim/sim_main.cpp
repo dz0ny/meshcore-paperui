@@ -62,14 +62,23 @@ static const Entry SCREENS[] = {
     S(compass), S(trail), S(battery), S(team), S(waypoints),
     { "waypoint_detail", &ui::screen::waypoint_detail::lifecycle, pre_waypoint_detail },
     S(provision),
+    { "keyboard", nullptr, nullptr },   // on-screen keyboard modal (synthetic)
 };
 #undef S
 
 static screen_lifecycle_t* g_life = nullptr;
 static void build_current() { if (g_life && g_life->create) g_life->create(screen_root()); }
+static void build_empty() {}
 
 static void render_screen(const Entry& e) {
     if (e.pre) e.pre();
+    // A null lifecycle is the on-screen keyboard demo: render an empty screen,
+    // then open the modal keyboard over it (kb_open paints itself).
+    if (!e.life) {
+        mono::go(build_empty);
+        ui::kit::keyboard_open("Pozdravljen", 150, nullptr, nullptr);
+        return;
+    }
     g_life = e.life;
     mono::go(build_current);
 }

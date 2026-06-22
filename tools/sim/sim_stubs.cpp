@@ -41,8 +41,30 @@ namespace model {
 
     void sim_seed() {
         clock.hour = 10; clock.minute = 54;
-        gps.has_fix = false; gps.satellites = 0;
+        gps.has_fix = true; gps.satellites = 9;
+        gps.lat = 46.05; gps.lng = 14.50;     // Ljubljana-ish, for team distances
         battery.percent = 37;
+        epoch_now = 100000;
+
+        // Team = favorited chat contacts. Seed two, with live positions so the
+        // Team screen shows distance/bearing instead of an empty list.
+        auto add_team = [](const char* name, uint8_t tag, int32_t lat_e6, int32_t lon_e6) {
+            ContactEntry& c = contacts[contact_count];
+            memset(&c, 0, sizeof(c));
+            strncpy(c.name, name, sizeof(c.name) - 1);
+            c.type = CONTACT_TYPE_CHAT;
+            c.flags = CONTACT_FLAG_FAVORITE;
+            for (int i = 0; i < 6; i++) c.pub_key[i] = tag + i;
+            LivePosition& p = live_positions[live_position_count++];
+            memset(&p, 0, sizeof(p));
+            for (int i = 0; i < 6; i++) p.pub_key_prefix[i] = tag + i;
+            strncpy(p.name, name, sizeof(p.name) - 1);
+            p.lat_e6 = lat_e6; p.lon_e6 = lon_e6;
+            p.timestamp = epoch_now - 120; p.valid = true;
+            contact_count++;
+        };
+        add_team("Ana",  0x10, 46070000, 14520000);
+        add_team("Bojan",0x20, 46030000, 14480000);
 
         auto add = [](const char* who, const char* text, bool self) {
             StoredMessage& m = msg_store[message_count++];
