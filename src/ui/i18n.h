@@ -25,7 +25,7 @@ enum Str : uint16_t {
     T_BATTERY, T_GPS_INFO, T_MESH_INFO,
     // settings menu
     T_DISPLAY, T_BLUETOOTH, T_GPS_SETTINGS, T_MESH_SETTINGS, T_LANGUAGE,
-    T_PRIVACY, T_ADVERT_GPS, T_SOUND, T_BUZZER, T_INVERT,
+    T_PRIVACY, T_ADVERT_GPS, T_SOUND, T_BUZZER, T_INVERT, T_CHANNEL_ALERTS,
     // common values
     T_ON, T_OFF, T_OK, T_NONE, T_AUTO,
     // set_gps
@@ -72,7 +72,7 @@ inline const char* t(Str id) {
         "Messages", "Trail", "Status", "Settings", "Team",
         "Battery", "GPS Info", "Mesh Info",
         "Display", "Bluetooth", "GPS Settings", "Mesh Settings", "Language",
-        "Privacy", "GPS in advert", "Sound", "Buzzer", "Invert",
+        "Privacy", "GPS in advert", "Sound", "Buzzer", "Invert", "Channel alerts",
         "On", "Off", "OK", "None", "Auto",
         "GPS", "Module", "RTC Sync",
         "Node", "TX Power", "GPS Share", "Repeat", "Radio", "Stats", "Peers",
@@ -97,7 +97,7 @@ inline const char* t(Str id) {
         "Sporočila", "Sled", "Stanje", "Nastavitve", "Ekipa",
         "Baterija", "GPS info", "Mesh info",
         "Zaslon", "Bluetooth", "GPS nastav.", "Mesh nastav.", "Jezik",
-        "Zasebnost", "GPS v oglasu", "Zvok", "Brenčalo", "Obrni barve",
+        "Zasebnost", "GPS v oglasu", "Zvok", "Brenčalo", "Obrni barve", "Opozorila kanala",
         "Da", "Ne", "OK", "Brez", "Samod.",
         "GPS", "Modul", "RTC sinhr.",
         "Vozlišče", "Moč TX", "Deli GPS", "Ponovi", "Radio", "Statistika", "Sosedje",

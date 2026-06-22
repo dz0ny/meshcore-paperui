@@ -79,6 +79,12 @@ void set_buzzer_enabled(bool enabled);
 uint8_t get_msg_channel();
 void    set_msg_channel(uint8_t channel_idx);
 
+// Whether incoming messages on the active channel chirp the buzzer. Off by
+// default so busy channels (e.g. Public) stay silent; direct (private) messages
+// always chirp regardless. Persisted across reboots. Wio/buzzer builds only.
+bool get_channel_alerts();
+void set_channel_alerts(bool on);
+
 // Profile sync (Provision, Wio only): pack/apply the device config minus its
 // identity. profile_export returns the blob length; profile_import applies it
 // and persists, after which the caller reboots.

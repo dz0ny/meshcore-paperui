@@ -392,6 +392,30 @@ void set_msg_channel(uint8_t channel_idx) {
     if (f) { f.write(&channel_idx, 1); f.close(); }
 }
 
+// Whether channel messages chirp the buzzer. Stored as a byte in LittleFS,
+// mirroring msg_channel. Default off (0): only direct messages chirp until the
+// user opts in from Display settings.
+static uint8_t s_channel_alerts = 0;
+static bool    s_channel_alerts_loaded = false;
+static void load_channel_alerts() {
+    if (s_channel_alerts_loaded) return;
+    s_channel_alerts_loaded = true;
+    using namespace Adafruit_LittleFS_Namespace;
+    InternalFS.begin();
+    File f = InternalFS.open("/chanalert", FILE_O_READ);
+    if (f) { int b = f.read(); f.close(); if (b >= 0) s_channel_alerts = (uint8_t)b; }
+}
+bool get_channel_alerts() { load_channel_alerts(); return s_channel_alerts != 0; }
+void set_channel_alerts(bool on) {
+    s_channel_alerts = on ? 1 : 0;
+    s_channel_alerts_loaded = true;
+    using namespace Adafruit_LittleFS_Namespace;
+    InternalFS.begin();
+    InternalFS.remove("/chanalert");
+    File f = InternalFS.open("/chanalert", FILE_O_WRITE);
+    if (f) { f.write(&s_channel_alerts, 1); f.close(); }
+}
+
 int  get_discovered(DiscoveredNode*, int) { return 0; }
 bool add_contact_by_prefix(const uint8_t*) { return false; }
 bool is_contact(const uint8_t*) { return false; }

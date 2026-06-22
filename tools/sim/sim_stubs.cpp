@@ -106,6 +106,8 @@ namespace mesh { namespace task {
     bool send_channel(uint8_t, const char*) { return true; }
     void set_node_name(const char*) {}
     void set_msg_channel(uint8_t) {}
+    bool get_channel_alerts() { return false; }
+    void set_channel_alerts(bool) {}
 
     // Radio params
     float   get_freq() { return 869.525f; }

@@ -23,6 +23,7 @@ static Handle lbl_lang    = nullptr;
 static Handle lbl_tz      = nullptr;
 static Handle lbl_msgchan = nullptr;
 static Handle lbl_invert  = nullptr;
+static Handle lbl_chanalert = nullptr;
 
 static void save_invert(bool on) {
     using namespace Adafruit_LittleFS_Namespace;
@@ -97,6 +98,12 @@ static void on_invert(void*) {
     if (lbl_invert) set_text(lbl_invert, i18n::t(on ? i18n::T_ON : i18n::T_OFF));
 }
 
+static void on_chanalert(void*) {
+    bool on = !mesh::task::get_channel_alerts();
+    mesh::task::set_channel_alerts(on);
+    if (lbl_chanalert) set_text(lbl_chanalert, i18n::t(on ? i18n::T_ON : i18n::T_OFF));
+}
+
 static void on_lang(void*) {
     uint8_t next = (i18n::get_lang() + 1) % i18n::LANG_COUNT;
     i18n::set_lang(next);
@@ -117,11 +124,14 @@ static void create(Handle parent) {
     lbl_invert = toggle_item(lst, i18n::t(i18n::T_INVERT),
                              i18n::t(ui::kit::mono::get_invert() ? i18n::T_ON : i18n::T_OFF),
                              on_invert, nullptr);
+    lbl_chanalert = toggle_item(lst, i18n::t(i18n::T_CHANNEL_ALERTS),
+                                i18n::t(mesh::task::get_channel_alerts() ? i18n::T_ON : i18n::T_OFF),
+                                on_chanalert, nullptr);
 }
 
 static void entry() {}
 static void exit_fn() {}
-static void destroy() { lbl_lang = nullptr; lbl_tz = nullptr; lbl_msgchan = nullptr; lbl_invert = nullptr; }
+static void destroy() { lbl_lang = nullptr; lbl_tz = nullptr; lbl_msgchan = nullptr; lbl_invert = nullptr; lbl_chanalert = nullptr; }
 
 screen_lifecycle_t lifecycle = { create, entry, exit_fn, destroy };
 

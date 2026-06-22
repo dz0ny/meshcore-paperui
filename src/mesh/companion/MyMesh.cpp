@@ -710,7 +710,8 @@ void MyMesh::onChannelMessageRecv(const mesh::GroupChannel &channel, mesh::Packe
     // just silently. get_msg_channel() is a buzzer-build feature; other builds
     // notify unconditionally.
 #ifdef PIN_BUZZER
-    if (_ui && channel_idx == mesh::task::get_msg_channel()) _ui->notify(UIEventType::channelMessage);
+    if (_ui && mesh::task::get_channel_alerts() && channel_idx == mesh::task::get_msg_channel())
+      _ui->notify(UIEventType::channelMessage);
 #else
     if (_ui) _ui->notify(UIEventType::channelMessage);
 #endif

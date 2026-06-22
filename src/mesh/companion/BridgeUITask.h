@@ -85,15 +85,16 @@ public:
         // Short RTTTL chirps per event (same tunes as the reference companion
         // firmware). play() is a no-op while quiet, and interrupts any chirp
         // still ringing. No melody editor — these are fixed.
+        // Only incoming messages chirp: direct (private) messages always, channel
+        // messages only when the caller decided to notify (the active channel with
+        // alerts enabled — see MyMesh). The send-side 'ack' chirp is intentionally
+        // dropped so the buzzer isn't going off for every message you send.
         switch (t) {
             case UIEventType::contactMessage:
                 buzzer.play("MsgRcv3:d=4,o=6,b=200:32e,32g,32b,16c7");
                 break;
             case UIEventType::channelMessage:
                 buzzer.play("kerplop:d=16,o=6,b=120:32g#,32c#");
-                break;
-            case UIEventType::ack:
-                buzzer.play("ack:d=32,o=8,b=120:c");
                 break;
             default:
                 break;

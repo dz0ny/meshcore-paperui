@@ -330,8 +330,17 @@ static const int N_BTN = sizeof(g_btns) / sizeof(g_btns[0]);
 // loop is blocked in an e-ink redraw (compass/trail timers, clock, mesh, etc.)
 // are still registered instead of silently dropped. attachInterrupt() takes an
 // argless handler, so there's one tiny ISR per button.
-static volatile bool g_latch[N_BTN] = {};
-#define BTN_ISR(i) static void isr_btn##i() { g_latch[i] = true; }
+//
+// The ISR also debounces: contact bounce fires several FALLING edges per press,
+// and a redraw can block the loop longer than a poll-side time window, so a
+// leftover bounce latch would fire a *second* time after the redraw. Collapsing
+// edges within BTN_BOUNCE_MS in the ISR keeps one press == one latch.
+static const uint32_t BTN_BOUNCE_MS = 60;
+static volatile bool     g_latch[N_BTN] = {};
+static volatile uint32_t g_latch_t[N_BTN] = {};
+#define BTN_ISR(i) static void isr_btn##i() { \
+    uint32_t t = millis(); \
+    if (t - g_latch_t[i] >= BTN_BOUNCE_MS) { g_latch_t[i] = t; g_latch[i] = true; } }
 BTN_ISR(0) BTN_ISR(1) BTN_ISR(2) BTN_ISR(3) BTN_ISR(4) BTN_ISR(5)
 static void (*const g_isr[N_BTN])() = { isr_btn0, isr_btn1, isr_btn2, isr_btn3, isr_btn4, isr_btn5 };
 
@@ -344,8 +353,9 @@ static void poll_buttons() {
         noInterrupts();
         if (g_latch[i]) { g_latch[i] = false; latched = true; }
         interrupts();
-        // Fire on a live edge OR a press the ISR caught during a blocking redraw.
-        if ((latched || (down && !b.prev)) && (now - b.t) > 150) {
+        // The ISR latch is already debounced, so fire it as-is. The live-edge path
+        // is only a fallback for a missed interrupt and keeps its own time window.
+        if (latched || ((down && !b.prev) && (now - b.t) > 150)) {
             b.t = now;
             // The on-screen keyboard is modal: it consumes every key (incl. L/R
             // and back-as-cancel) until it closes itself.
@@ -409,7 +419,6 @@ static void load_invert() {
 
 void setup() {
     Serial.begin(115200);
-    delay(200);
     board_wio::init();
     for (int i = 0; i < N_BTN; i++) {
         pinMode(g_btns[i].pin, INPUT_PULLUP);
@@ -510,6 +519,10 @@ void loop() {
 
     mono::tick(millis());
     mono::render();
-    delay(5);
+    // Yield to the FreeRTOS scheduler / SoftDevice without a fixed delay — a
+    // blocking delay() here just adds latency to button polling and the mesh
+    // pump. render() already early-returns when nothing is dirty, so a fast loop
+    // costs nothing extra.
+    yield();
 }
 #endif // BOARD_WIO_L1
