@@ -81,7 +81,7 @@ namespace model {
             m.is_self = self;
             m.channel_idx = 0;
         };
-        add("Ana",  "Sem na poti, pridem cez 10 minut.", false);
+        add("Ana \xF0\x9F\x9A\x80", "Sem na poti, pridem cez 10 minut.", false);   // emoji in sender name
         add("me",   "OK", true);
         add("Bojan","Najdemo se pri koci na vrhu?", false);
         add("me",   "Ja, super. Vidimo se tam.", true);
@@ -94,7 +94,7 @@ namespace model {
 // ---- mesh::task ------------------------------------------------------------
 namespace mesh { namespace task {
     uint8_t get_msg_channel() { return 0; }
-    const char* node_name() { return "me"; }
+    const char* node_name() { return "Bob \xF0\x9F\x9A\x80"; }   // "Bob 🚀" — emoji header test
     int get_channels(ChannelEntry* dest, int max_num) {
         if (max_num < 1) return 0;
         dest[0].idx = 0;

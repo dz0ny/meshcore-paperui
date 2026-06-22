@@ -118,12 +118,21 @@ static uint32_t utf8_next(const char*& p) {
     if ((c & 0xF0) == 0xE0 && (p[0] & 0xC0) == 0x80 && (p[1] & 0xC0) == 0x80) {
         uint32_t cp = (uint32_t)(c & 0x0F) << 12; cp |= (uint32_t)(*p++ & 0x3F) << 6; cp |= (*p++ & 0x3F); return cp;
     }
+    // 4-byte sequence (emoji, U+10000+): decode the real codepoint so it reads as
+    // one out-of-range character (→ dropped) instead of 4 stray Lemon glyphs.
+    if ((c & 0xF8) == 0xF0 && (p[0] & 0xC0) == 0x80 && (p[1] & 0xC0) == 0x80 && (p[2] & 0xC0) == 0x80) {
+        uint32_t cp = (uint32_t)(c & 0x07) << 18;
+        cp |= (uint32_t)(*p++ & 0x3F) << 12; cp |= (uint32_t)(*p++ & 0x3F) << 6; cp |= (*p++ & 0x3F);
+        return cp;
+    }
     return c;
 }
 
-// Glyph for a codepoint, falling back to '?' for anything outside Lemon's range.
+// Glyph for a codepoint, or nullptr for anything the Lemon font doesn't cover
+// (emoji, etc.) — callers drop those so unsupported text degrades to blanks
+// rather than garbled glyphs.
 static const GFXglyph* glyph_for(uint32_t cp) {
-    if (cp < Lemon.first || cp > Lemon.last) cp = '?';
+    if (cp < Lemon.first || cp > Lemon.last) return nullptr;
     return &((const GFXglyph*)Lemon.glyph)[cp - Lemon.first];
 }
 
@@ -132,7 +141,7 @@ static int text_w(const char* s, Font f) {
     const char* p = s;
     while (*p) {
         int w = 0;
-        while (*p && *p != '\n') { uint32_t cp = utf8_next(p); w += glyph_for(cp)->xAdvance * scale; }
+        while (*p && *p != '\n') { uint32_t cp = utf8_next(p); const GFXglyph* g = glyph_for(cp); if (g) w += g->xAdvance * scale; }
         if (w > best) best = w;
         if (*p == '\n') p++;
     }
@@ -325,7 +334,8 @@ void   msg_append(Handle l, const char* sender, const char* text, bool is_self, 
         while (*q) {
             const char* cp_start = q;
             uint32_t cp = utf8_next(q);
-            int adv = glyph_for(cp)->xAdvance * scale;
+            const GFXglyph* g = glyph_for(cp);
+            int adv = g ? g->xAdvance * scale : 0;   // unsupported (emoji) take no space
             if ((int)(q - line_start) > CAP && cp_start > line_start) { q = cp_start; break; }
             if (w + adv > maxpx && cp_start > line_start) { q = cp_start; break; }
             w += adv;
@@ -522,6 +532,7 @@ static void draw_text(int x, int y, const char* s, Font f, bool invert) {
         while (*p && *p != '\n') {
             uint32_t cp = utf8_next(p);
             const GFXglyph* g = glyph_for(cp);
+            if (!g) continue;            // unsupported (emoji): skip, don't garble
             blit_glyph(g, cx, baseline, scale, col);
             cx += g->xAdvance * scale;
         }
