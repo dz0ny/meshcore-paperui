@@ -1,9 +1,15 @@
 #pragma once
 #include <stdint.h>
+#include "ui_kit.h"   // ui::kit::Font
 
 // Mono-backend-only entry points (the LVGL backend has lv_timer_handler instead).
 // main_wio builds a screen with the ui::kit facade, then drives it with these.
 namespace ui::kit::mono {
+
+// Draw / measure Lemon text directly, for app-painted chrome like the status bar
+// title (same font + glyphs as node labels, so diacritics render).
+void text(int x, int y, const char* s, Font f);
+int  text_width(const char* s, Font f);
 
 void reset();                 // drop the current node tree (start a new screen)
 void render();                // layout + draw the tree to the e-ink (paged)

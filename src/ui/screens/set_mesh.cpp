@@ -9,6 +9,9 @@
 #include "../components/toast.h"
 #include "../../model.h"
 #include "../../mesh/mesh_task.h"
+#ifdef BOARD_WIO_L1
+#include "../screen_ids.h"      // SCREEN_MESH (status page) — Wio nav only
+#endif
 
 namespace ui::screen::set_mesh {
 
@@ -40,6 +43,10 @@ static int find_i8(const int8_t* a, int n, int8_t v) { for (int i=0;i<n;i++) if(
 static char buf[32];
 
 static void on_back(void*) { ui::screen_mgr::pop(true); }
+
+#ifdef BOARD_WIO_L1
+static void on_status(void*) { ui::screen_mgr::push(SCREEN_MESH, true); }   // → mesh info page
+#endif
 
 static void on_freq(void*) {
     int i = (find_f(freqs, n_freqs, mesh::task::get_freq()) + 1) % n_freqs;
@@ -94,6 +101,9 @@ static void on_advert_flood(void*) {
 
 static void create(Handle parent) {
     Handle lst = list(parent);
+#ifdef BOARD_WIO_L1
+    menu_row(lst, i18n::t(i18n::T_STATUS), on_status, nullptr);   // → mesh info page
+#endif
 
     auto& m = model::mesh;
 

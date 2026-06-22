@@ -31,6 +31,10 @@ namespace ui { namespace screen {
 #undef SIM_SCREEN
 }}
 
+// Title for the centered status-bar slot (sim shows the screen's name; the device
+// maps screen ids to i18n titles in main_wio's title_for()).
+static const char* g_title = nullptr;
+
 // Mirror of main_wio.cpp draw_statusbar so the sim chrome matches the device.
 static void draw_statusbar(int w, int h) {
     (void)h;
@@ -45,7 +49,17 @@ static void draw_statusbar(int w, int h) {
     else                    snprintf(g, sizeof(g), "GPS --");
     char r[24];
     snprintf(r, sizeof(r), "%s  %d%%", g, model::battery.percent);
-    display.setCursor(w - (int)strlen(r) * 6 - 2, 3); display.print(r);
+    int r_x = w - (int)strlen(r) * 6 - 2;
+    display.setCursor(r_x, 3); display.print(r);
+
+    if (g_title && g_title[0]) {
+        int clock_end = 2 + (int)strlen(t) * 6;
+        int tw = mono::text_width(g_title, ui::kit::Font::Small);
+        int tx = (w - tw) / 2;
+        if (tx < clock_end + 4) tx = clock_end + 4;
+        if (tx + tw > r_x - 4) tx = r_x - 4 - tw;
+        if (tx >= clock_end + 4) mono::text(tx, 2, g_title, ui::kit::Font::Small);
+    }
 }
 
 // ---- screen registry -------------------------------------------------------
@@ -71,6 +85,7 @@ static void build_current() { if (g_life && g_life->create) g_life->create(scree
 static void build_empty() {}
 
 static void render_screen(const Entry& e) {
+    g_title = e.name;
     if (e.pre) e.pre();
     // A null lifecycle is the on-screen keyboard demo: render an empty screen,
     // then open the modal keyboard over it (kb_open paints itself).

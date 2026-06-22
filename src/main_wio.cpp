@@ -8,15 +8,12 @@
 #include "ui/i18n.h"
 #include "ui/kit/ui_kit.h"
 #include "ui/kit/ui_kit_mono.h"
-#include "ui/screens/status.h"
 #include "ui/screens/settings.h"
 #include "ui/screens/gps.h"
 #include "ui/screens/mesh_settings.h"
 #include "ui/screens/set_gps.h"
 #include "ui/screens/set_mesh.h"
 #include "ui/screens/set_display.h"
-#include "ui/screens/set_sound.h"
-#include "ui/screens/set_privacy.h"
 #include "ui/screens/set_ble.h"
 #include "ui/screens/chat.h"
 #include "ui/screens/quick_reply.h"
@@ -187,6 +184,32 @@ static void draw_mesh_step(const char* s) {
 }
 
 // ---- status bar (clock / GPS) ----------------------------------------------
+// Title shown centered in the status bar so each sub-screen says where you are.
+// Home falls back to the node name. Returns nullptr to show nothing.
+static const char* title_for(int id) {
+    switch (id) {
+        case SCREEN_HOME:       return mesh::task::node_name();
+        case SCREEN_CHAT:       return i18n::t(i18n::T_MESSAGES);
+        case SCREEN_QUICKREPLY: return i18n::t(i18n::T_REPLY);
+        case SCREEN_SETTINGS:   return i18n::t(i18n::T_SETTINGS);
+        case SCREEN_GPS:        return i18n::t(i18n::T_GPS_INFO);
+        case SCREEN_MESH:       return i18n::t(i18n::T_MESH_INFO);
+        case SCREEN_SET_GPS:    return i18n::t(i18n::T_GPS_SETTINGS);
+        case SCREEN_SET_MESH:   return i18n::t(i18n::T_MESH_SETTINGS);
+        case SCREEN_SET_DISPLAY:return i18n::t(i18n::T_DISPLAY);
+        case SCREEN_SET_BLE:    return i18n::t(i18n::T_BLUETOOTH);
+        case SCREEN_BATTERY:    return i18n::t(i18n::T_BATTERY);
+        case SCREEN_TRAIL:      return i18n::t(i18n::T_TRAIL);
+        case SCREEN_TEAM:       return i18n::t(i18n::T_TEAM);
+        case SCREEN_WAYPOINTS:  return i18n::t(i18n::T_WAYPOINTS);
+        case SCREEN_WAYPOINT_DETAIL: return i18n::t(i18n::T_WAYPOINTS);
+        case SCREEN_PROVISION:
+        case SCREEN_PROVISION_RUN:
+        case SCREEN_PROVISION_PICK:  return i18n::t(i18n::T_PROVISION);
+        default:                return nullptr;   // e.g. compass — fills the screen itself
+    }
+}
+
 static void draw_statusbar(int w, int h) {
     (void)h;
     display.setFont(nullptr);
@@ -202,7 +225,19 @@ static void draw_statusbar(int w, int h) {
     else                    snprintf(g, sizeof(g), "GPS --");
     char r[24];
     snprintf(r, sizeof(r), "%s  %d%%", g, model::battery.percent);
-    display.setCursor(w - (int)strlen(r) * 6 - 2, 3); display.print(r);
+    int r_x = w - (int)strlen(r) * 6 - 2;
+    display.setCursor(r_x, 3); display.print(r);
+
+    // Screen title, centered in the gap (Lemon font so diacritics render).
+    const char* title = title_for(ui::screen_mgr::top_id());
+    if (title && title[0]) {
+        int clock_end = 2 + (int)strlen(t) * 6;
+        int tw = mono::text_width(title, ui::kit::Font::Small);
+        int tx = (w - tw) / 2;
+        if (tx < clock_end + 4) tx = clock_end + 4;       // don't collide with the clock
+        if (tx + tw > r_x - 4) tx = r_x - 4 - tw;         // …or the battery block
+        if (tx >= clock_end + 4) mono::text(tx, 2, title, ui::kit::Font::Small);
+    }
 }
 
 // ---- home screen ------------------------------------------------------------
@@ -210,7 +245,6 @@ static void home_messages(void*) { ui::screen_mgr::push(SCREEN_CHAT, true); }
 static void home_team(void*)     { ui::screen_mgr::push(SCREEN_TEAM, true); }
 static void home_trail(void*)    { ui::screen_mgr::push(SCREEN_TRAIL, true); }
 static void home_waypoints(void*){ ui::screen_mgr::push(SCREEN_WAYPOINTS, true); }
-static void home_status(void*)   { ui::screen_mgr::push(SCREEN_STATUS, true); }
 static void home_settings(void*) { ui::screen_mgr::push(SCREEN_SETTINGS, true); }
 
 static void home_create(Handle root) {
@@ -223,8 +257,7 @@ static void home_create(Handle root) {
         menu_row(lst, i18n::t(i18n::T_TEAM), home_team, nullptr);
     menu_row(lst, i18n::t(i18n::T_TRAIL),    home_trail,    nullptr);
     menu_row(lst, i18n::t(i18n::T_WAYPOINTS), home_waypoints, nullptr);
-    // GPS / Mesh / Battery live under Status (it already lists their info pages).
-    menu_row(lst, i18n::t(i18n::T_STATUS),   home_status,   nullptr);
+    // Status (GPS / Mesh / Battery info) now lives under Settings.
     menu_row(lst, i18n::t(i18n::T_SETTINGS), home_settings, nullptr);
 }
 static void noop() {}
@@ -371,15 +404,12 @@ void setup() {
     // Bring the UI up first so the screen is responsive even if mesh init is slow.
     ui::screen_mgr::register_screen(SCREEN_DASH,     &dash_life);
     ui::screen_mgr::register_screen(SCREEN_HOME,     &home_life);
-    ui::screen_mgr::register_screen(SCREEN_STATUS,   &ui::screen::status::lifecycle);
     ui::screen_mgr::register_screen(SCREEN_SETTINGS, &ui::screen::settings::lifecycle);
     ui::screen_mgr::register_screen(SCREEN_GPS,      &ui::screen::gps::lifecycle);
     ui::screen_mgr::register_screen(SCREEN_MESH,     &ui::screen::mesh_settings::lifecycle);
     ui::screen_mgr::register_screen(SCREEN_SET_GPS,  &ui::screen::set_gps::lifecycle);
     ui::screen_mgr::register_screen(SCREEN_SET_MESH, &ui::screen::set_mesh::lifecycle);
     ui::screen_mgr::register_screen(SCREEN_SET_DISPLAY, &ui::screen::set_display::lifecycle);
-    ui::screen_mgr::register_screen(SCREEN_SOUND, &ui::screen::set_sound::lifecycle);
-    ui::screen_mgr::register_screen(SCREEN_PRIVACY, &ui::screen::set_privacy::lifecycle);
     ui::screen_mgr::register_screen(SCREEN_SET_BLE,  &ui::screen::set_ble::lifecycle);
     ui::screen_mgr::register_screen(SCREEN_CHAT,     &ui::screen::chat::lifecycle);
     ui::screen_mgr::register_screen(SCREEN_QUICKREPLY, &ui::screen::quick_reply::lifecycle);

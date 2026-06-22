@@ -32,18 +32,6 @@ static void on_reply(void*) { ui::screen_mgr::push(SCREEN_QUICKREPLY, true); }
 static bool msg_visible(const model::StoredMessage& m) {
     return m.channel_idx == active_channel;
 }
-
-// Human-readable name of the active channel (falls back to a numbered label).
-static const char* active_channel_name() {
-    static char buf[24];
-    mesh::task::ChannelEntry chans[16];
-    int n = mesh::task::get_channels(chans, 16);
-    for (int i = 0; i < n; i++) {
-        if (chans[i].idx == active_channel) return chans[i].name;
-    }
-    snprintf(buf, sizeof(buf), "Ch %d", (int)active_channel);
-    return buf;
-}
 #else
 static bool msg_visible(const model::StoredMessage&) { return true; }
 #endif
@@ -83,11 +71,6 @@ void process_events() {
 static void create(Handle parent) {
 #ifdef BOARD_WIO_L1
     active_channel = mesh::task::get_msg_channel();
-    // One-line header so the user knows which channel they are viewing.
-    Handle hdr = label(parent, active_channel_name());
-    size(hdr, pct(100), CONTENT);
-    font(hdr, Font::Small);
-    text_center(hdr);
 #endif
 
     msg_container = msglist(parent);

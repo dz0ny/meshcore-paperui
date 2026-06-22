@@ -46,7 +46,7 @@ enum Str : uint16_t {
     T_REPLY, T_SENT, T_SEND_FAILED, T_NO_GPS_FIX, T_QR_GPS_LOC,
     T_QR_OMW, T_QR_YES, T_QR_NO, T_QR_HELP, T_QR_ARRIVED, T_QR_TYPE_MSG,
     // map / compass
-    T_MAP, T_NO_LOCATIONS, T_MOVE_TO_CAL,
+    T_MAP, T_NO_LOCATIONS, T_MOVE_TO_CAL, T_NO_TARGET,
     // time
     T_TIMEZONE,
     // provision (settings sync)
@@ -84,7 +84,7 @@ inline const char* t(Str id) {
         "No messages yet", "Channel", "GPS Chan", "unread",
         "Reply", "Sent", "Send failed", "No GPS fix", "GPS location",
         "On my way", "Yes", "No", "Need help", "Arrived", "Type message",
-        "Map", "No positions yet", "Move to calibrate",
+        "Map", "No positions yet", "Move to calibrate", "No target",
         "Time zone",
         "Provision", "Share Profile", "Receive Profile",
         "Waiting for receiver", "Searching...", "Transferring", "Done", "Failed", "Select device",
@@ -101,7 +101,7 @@ inline const char* t(Str id) {
         "Da", "Ne", "OK", "Brez", "Samod.",
         "GPS", "Modul", "RTC sinhr.",
         "Vozlišče", "Moč TX", "Deli GPS", "Ponovi", "Radio", "Statistika", "Sosedje",
-        "Stanje", "Š. širina", "Z. dolžina", "Sateliti", "Višina", "Hitrost",
+        "Stanje", "Zem. širina", "Zem. dolžina", "Sateliti", "Višina", "Hitrost",
         "Polnost", "Napetost", "Tok",
         "Začni", "Ustavi", "Počisti", "Ni GPS / sledi", "Ustavljeno", "Čakam fix",
         "Sledim", "Sledenje vklop.", "Čakam GPS fix", "Sledenje ustavljeno",
@@ -109,7 +109,7 @@ inline const char* t(Str id) {
         "Ni sporočil", "Kanal", "GPS kanal", "neprebranih",
         "Odgovori", "Poslano", "Pošiljanje ni uspelo", "Ni GPS fix", "GPS lokacija",
         "Že grem", "Da", "Ne", "Rabim pomoč", "Prispel", "Napiši sporočilo",
-        "Zemljevid", "Ni lokacij", "Premakni za kalib.",
+        "Zemljevid", "Ni lokacij", "Premakni za kalib.", "Ni cilja",
         "Časovni pas",
         "Prenos nastav.", "Deli profil", "Prejmi profil",
         "Čakam prejemnika", "Iščem...", "Prenašam", "Končano", "Napaka", "Izberi napravo",

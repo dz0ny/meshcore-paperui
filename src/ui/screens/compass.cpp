@@ -127,7 +127,12 @@ static void rebuild() {
                                   tgt_name[0] ? tgt_name : "?", dbuf,
                                   ui::geo::bearing_to_cardinal(brg));
         if (hint_label) hidden(hint_label, model::gps.heading_valid);
+    } else if (!have_target) {
+        // No destination chosen — say so instead of a bare dial + "?".
+        if (info_label) set_text(info_label, i18n::t(i18n::T_NO_TARGET));
+        if (hint_label) hidden(hint_label, true);
     } else {
+        // Target known but no fix yet — show its name, distance unknown.
         if (info_label) set_textf(info_label, "%s\n--", tgt_name[0] ? tgt_name : "?");
         if (hint_label) hidden(hint_label, true);
     }

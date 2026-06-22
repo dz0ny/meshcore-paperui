@@ -5,12 +5,19 @@
 #include "../i18n.h"
 #include "../../model.h"
 #include "../../mesh/mesh_task.h"
+#ifdef BOARD_WIO_L1
+#include "../screen_ids.h"      // SCREEN_GPS (status page) — Wio nav only
+#endif
 
 // GPS settings — ported to the ui::kit facade.
 
 namespace ui::screen::set_gps {
 
 using namespace ui::kit;
+
+#ifdef BOARD_WIO_L1
+static void on_status(void*) { ui::screen_mgr::push(SCREEN_GPS, true); }
+#endif
 
 static Handle lbl_gps_enabled = nullptr;
 
@@ -73,6 +80,9 @@ static void on_fastregion(void*) {
 
 static void create(Handle parent) {
     Handle lst = list(parent);
+#ifdef BOARD_WIO_L1
+    menu_row(lst, i18n::t(i18n::T_STATUS), on_status, nullptr);   // → GPS info page
+#endif
     lbl_gps_enabled = toggle_item(lst, i18n::t(i18n::T_GPS), i18n::t(mesh::task::get_gps_enabled() ? i18n::T_ON : i18n::T_OFF), on_gps_toggle, nullptr);
 #ifdef BOARD_WIO_L1
     lbl_fastgps = toggle_item(lst, i18n::t(i18n::T_GPS_CHANNEL), fastgps_label(), on_fastgps, nullptr);

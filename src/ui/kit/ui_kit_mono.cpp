@@ -46,6 +46,7 @@ struct Node {
 
     bool  hidden, clickable, focusable_, card, center;
     bool  bar;                // inverted full-width header bar (Solo sender style)
+    bool  bar_right;          // align the bar's text to the right (own messages)
     Font  font;
     char  text[40];
     Cb    cb; void* user;
@@ -300,6 +301,7 @@ void   msg_append(Handle l, const char* sender, const char* text, bool is_self, 
     Handle h = label(l, who);
     N(h)->font = Font::Small;
     N(h)->bar = true;              // Solo-style inverted sender header bar
+    N(h)->bar_right = is_self;     // right-align own messages
     N(h)->w_spec = pct(100);       // span the list so the bar runs full width
 
     const char* body = text ? text : "";
@@ -537,9 +539,11 @@ static void draw_node(Node* n) {
         // inverted text when the enclosing clickable row is focused
         for (Node* a = n->parent; a; a = a->parent) if (a == g_focus) { inv = true; break; }
         // Solo-style sender bar: fill the full row in ink, draw the text reversed.
+        // Own messages right-align the name so they read as "mine" at a glance.
         if (n->bar && !inv) {
             display.fillRect(n->x, sy, n->w, n->h, cfg());
-            draw_text(n->x + 2, sy, n->text, n->font, true);
+            int tx = n->bar_right ? n->x + n->w - text_w(n->text, n->font) - 2 : n->x + 2;
+            draw_text(tx, sy, n->text, n->font, true);
             return;
         }
         draw_text(n->x, sy, n->text, n->font, inv);
@@ -696,12 +700,14 @@ static void kb_draw() {
     const int bh = avail / bands;
     const int top = hh;
 
-    // preview: tail of the typed text that fits, plus a cursor underscore
-    int cpl = (W / char_w(Font::Body)) - 1; if (cpl < 1) cpl = 1;
+    // preview: tail of the typed text that fits, plus a cursor underscore.
+    // Drawn in the 2x font so the in-progress message is actually readable.
+    int cpl = (W / char_w(Font::Title)) - 1; if (cpl < 1) cpl = 1;
     int from = (g_kb_len > cpl) ? g_kb_len - cpl : 0;
     char prev[48];
     snprintf(prev, sizeof(prev), "%s_", g_kb_buf + from);
-    draw_text(2, top + (bh - 8) / 2, prev, Font::Body, false);
+    int pvy = top + (bh - 16) / 2; if (pvy < top) pvy = top;
+    draw_text(2, pvy, prev, Font::Title, false);
     display.drawFastHLine(0, top + bh - 1, W, cfg());
 
     // character grid
@@ -820,6 +826,9 @@ void set_invert(bool on) {
 }
 
 void set_statusbar(int h, StatusbarFn fn) { g_sb_h = h; g_sb_fn = fn; g_dirty = true; }
+
+void text(int x, int y, const char* s, Font f) { draw_text(x, y, s, f, false); }
+int  text_width(const char* s, Font f) { return text_w(s, f); }
 
 void tick(uint32_t now_ms) {
     // Expire the toast banner: clear it and force one redraw to erase it.
