@@ -8,6 +8,7 @@
 #ifdef BOARD_WIO_L1
   #include "../screen_ids.h"
   #include "../../mesh/mesh_task.h"   // active-channel selection + enumeration
+  #include "../kit/ui_kit_mono.h"     // mono::set_footer (fixed Reply action bar)
 #endif
 
 // Messages (chat) — ported to the ui::kit facade.
@@ -86,15 +87,15 @@ static void create(Handle parent) {
     msg_container = msglist(parent);
     size(msg_container, pct(100), pct(100));
 #ifdef BOARD_WIO_L1
-    grow(msg_container, 1);   // fill the space between the header and Reply button
+    grow(msg_container, 1);   // fill the content band above the fixed Reply footer
 #endif
 
     populate();
 
 #ifdef BOARD_WIO_L1
-    // Keyboard-less reply: a focusable button that opens the quick-reply menu.
-    Handle reply = button(parent, i18n::t(i18n::T_REPLY), on_reply, nullptr);
-    size(reply, pct(100), CONTENT);
+    // Reply lives in the always-visible footer bar: Left/Right opens the
+    // quick-reply menu, leaving Up/Down free to scroll the message history.
+    mono::set_footer(i18n::t(i18n::T_REPLY), on_reply, nullptr);
 #endif
 
     model::clear_unread_messages();

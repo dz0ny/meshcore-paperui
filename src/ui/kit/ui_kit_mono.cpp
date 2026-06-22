@@ -74,6 +74,16 @@ static int          g_sb_h = 0;
 static mono::StatusbarFn g_sb_fn = nullptr;
 static int header_h() { return g_sb_fn ? g_sb_h : 0; }
 
+// Fixed bottom action bar — always visible, never scrolls. The engine sizes and
+// paints it (solid bar + centered label) and routes Left/Right presses to its
+// callback. Set per screen; reset() clears it. line_h() is defined below, so the
+// height is resolved lazily in footer_h().
+static char         g_footer_label[24] = {0};
+static Cb           g_footer_cb   = nullptr;
+static void*        g_footer_user = nullptr;
+static int line_h(Font f);
+static int footer_h() { return g_footer_cb ? line_h(Font::Title) + 6 : 0; }
+
 static Node* alloc(Kind k) {
     if (g_used >= POOL) return &g_pool[POOL - 1];   // clamp; never crash
     Node* n = &g_pool[g_used++];
@@ -166,9 +176,9 @@ Handle content_area(Handle parent) { Node* n = alloc(K_CONT); n->lay = L_COL; n-
 
 void size(Handle h, int w, int hgt) { N(h)->w_spec = w; N(h)->h_spec = hgt; }
 int  px_width(Handle h)  { return N(h)->w > 0 ? N(h)->w : display.width(); }
-// Fallback (node not laid out yet) excludes the status bar so canvases sized off
-// this fit the visible viewport rather than overflowing the bottom edge.
-int  px_height(Handle h) { return N(h)->h > 0 ? N(h)->h : (display.height() - header_h()); }
+// Fallback (node not laid out yet) excludes the status/footer bars so canvases
+// sized off this fit the visible viewport rather than overflowing an edge.
+int  px_height(Handle h) { return N(h)->h > 0 ? N(h)->h : (display.height() - header_h() - footer_h()); }
 void pos(Handle h, int x, int y) { N(h)->dx = x; N(h)->dy = y; N(h)->align = Align::TopLeft; }
 void pad(Handle h, int all)      { N(h)->pad = all; }
 void gap(Handle h, int between)  { N(h)->gap = between; }
@@ -768,6 +778,7 @@ void reset() {
     g_root->pad = 2;
     g_dirty = true;
     g_scroll = 0;                // new screen starts at the top
+    g_footer_cb = nullptr;       // each screen re-declares its own footer (if any)
     // Note: do NOT force a full refresh on screen change — a partial refresh
     // already repaints the whole window (fillScreen + redraw), so switching
     // screens stays flash-free. Only the very first boot draw is full.
@@ -793,10 +804,11 @@ void render() {
     if (!g_dirty) return;
     g_dirty = false;
 
-    // Lay out into the viewport BELOW the status bar — draw_node() shifts every
-    // node down by header_h(), so laying out the full panel height would push the
-    // bottom `header_h()` pixels (e.g. bottom-aligned buttons) off-screen.
-    int vh = display.height() - header_h();
+    // Lay out into the viewport BETWEEN the status bar and the footer —
+    // draw_node() shifts every node down by header_h(), so the content band is
+    // [header_h, height - footer_h]; laying out the full panel height would push
+    // bottom content under (or off) those fixed bars.
+    int vh = display.height() - header_h() - footer_h();
     g_root->h_spec = vh;
     layout(g_root, 0, 0, display.width(), vh);
     if (!g_focus) g_focus = first_focusable(g_root);
@@ -823,6 +835,14 @@ void render() {
             g_sb_fn(display.width(), g_sb_h);
             display.drawFastHLine(0, g_sb_h - 1, display.width(), cfg());
         }
+        if (g_footer_cb && !g_kb_on) {
+            // Footer action bar at the bottom — a solid bar with the label, drawn
+            // over any content that scrolled under it. Reachable via Left/Right.
+            int fh = footer_h(), fy = display.height() - fh, W = display.width();
+            display.fillRect(0, fy, W, fh, cfg());
+            int tw = text_w(g_footer_label, Font::Title);
+            draw_text((W - tw) / 2, fy + (fh - line_h(Font::Title)) / 2, g_footer_label, Font::Title, true);
+        }
         draw_toast();
     } while (display.nextPage());
     // The first draw is an effective full (GxEPD2 self-fulls it), so it baselines
@@ -845,6 +865,14 @@ void set_invert(bool on) {
 }
 
 void set_statusbar(int h, StatusbarFn fn) { g_sb_h = h; g_sb_fn = fn; g_dirty = true; }
+
+void set_footer(const char* label, Cb fn, void* user) {
+    g_footer_cb = (label && label[0]) ? fn : nullptr;
+    g_footer_user = user;
+    strncpy(g_footer_label, label ? label : "", sizeof(g_footer_label) - 1);
+    g_footer_label[sizeof(g_footer_label) - 1] = 0;
+    g_dirty = true;
+}
 
 void text(int x, int y, const char* s, Font f) { draw_text(x, y, s, f, false); }
 int  text_width(const char* s, Font f) { return text_w(s, f); }
@@ -895,16 +923,18 @@ static int content_bottom(Node* n) {
 void feed_key(char key) {
     if (g_kb_on) { kb_handle_key(key); return; }   // modal keyboard eats all keys
     if (key == 'B') { back(); return; }
+    // Left/Right invoke the fixed footer action (e.g. chat's Reply), so it's
+    // reachable without disturbing the Up/Down scroll position.
+    if (key == 'L' || key == 'R') { if (g_footer_cb) g_footer_cb(g_footer_user); return; }
 
     Node* foc[POOL]; int cnt = 0;
     collect_focusables(g_root, foc, cnt, POOL);
 
     // Page-scroll the whole screen by half a viewport. Used when U/D shouldn't
-    // move a focus cursor: read-only screens (cnt==0) and screens with a single
-    // action button below a taller list (e.g. chat's Reply) — there the lone
-    // focusable can't cycle, so U/D scrolls the history instead.
+    // move a focus cursor: read-only screens and screens whose action lives in
+    // the fixed footer (e.g. chat) — there U/D scrolls the content instead.
     auto page_scroll = [&](char k) {
-        int vp = display.height() - header_h();   // viewport below the status bar
+        int vp = display.height() - header_h() - footer_h();   // visible content band
         int total = content_bottom(g_root);
         int maxscroll = total - vp; if (maxscroll < 0) maxscroll = 0;
         if (maxscroll == 0) return;             // everything fits
@@ -929,7 +959,7 @@ void feed_key(char key) {
 
     auto ensure_visible = [&]() {
         if (!g_focus) return;
-        int H = display.height(), hh = header_h();
+        int H = display.height() - footer_h(), hh = header_h();        // visible band bottom
         int top = g_focus->y + hh - g_scroll;
         int bot = g_focus->y + g_focus->h + hh - g_scroll;
         if (top < hh)     g_scroll = g_focus->y;                       // just below status bar
