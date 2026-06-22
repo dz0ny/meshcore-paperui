@@ -9,10 +9,10 @@
 // is the caller's job: read the stored byte at boot and call set_lang(); write
 // it back when the user changes it (main_wio.cpp does this via InternalFS).
 //
-// IMPORTANT: the mono e-ink backend draws with Adafruit-GFX's built-in 5x7
-// font, which is ASCII-only. Slovenian translations are therefore written
-// WITHOUT the diacritics c/s/z-with-caron (they would render as tofu) — e.g.
-// "Sporocila", "Pocisti". This is the standard "ASCII Slovenian" fallback.
+// Both backends now render UTF-8: the LVGL fonts include Latin Extended, and the
+// mono e-ink backend draws node labels with the Lemon GFXfont (Latin + Cyrillic,
+// U+0020–U+04FF). So Slovenian is written with proper diacritics (č/š/ž). The
+// status bar still uses the ASCII 6x8 classic font, but only shows ASCII text.
 
 namespace i18n {
 
@@ -94,28 +94,28 @@ inline const char* t(Str id) {
         "English", "Slovensko",
     };
     static const char* const SL_T[T_COUNT] = {
-        "Sporocila", "Sled", "Stanje", "Nastavitve", "Ekipa",
+        "Sporočila", "Sled", "Stanje", "Nastavitve", "Ekipa",
         "Baterija", "GPS info", "Mesh info",
         "Zaslon", "Bluetooth", "GPS nastav.", "Mesh nastav.", "Jezik",
-        "Zasebnost", "GPS v oglasu", "Zvok", "Brencalo", "Obrni barve",
+        "Zasebnost", "GPS v oglasu", "Zvok", "Brenčalo", "Obrni barve",
         "Da", "Ne", "OK", "Brez", "Samod.",
         "GPS", "Modul", "RTC sinhr.",
-        "Vozlisce", "Moc TX", "Deli GPS", "Ponovi", "Radio", "Statistika", "Sosedje",
-        "Stanje", "S. sirina", "Z. dolzina", "Sateliti", "Visina", "Hitrost",
+        "Vozlišče", "Moč TX", "Deli GPS", "Ponovi", "Radio", "Statistika", "Sosedje",
+        "Stanje", "Š. širina", "Z. dolžina", "Sateliti", "Višina", "Hitrost",
         "Polnost", "Napetost", "Tok",
-        "Zacni", "Ustavi", "Pocisti", "Ni GPS / sledi", "Ustavljeno", "Cakam fix",
-        "Sledim", "Sledenje vklop.", "Cakam GPS fix", "Sledenje ustavljeno",
-        "Sled pociscena",
-        "Ni sporocil", "Kanal", "GPS kanal", "neprebranih",
-        "Odgovori", "Poslano", "Posiljanje ni uspelo", "Ni GPS fix", "GPS lokacija",
-        "Ze grem", "Da", "Ne", "Rabim pomoc", "Prispel", "Napisi sporocilo",
+        "Začni", "Ustavi", "Počisti", "Ni GPS / sledi", "Ustavljeno", "Čakam fix",
+        "Sledim", "Sledenje vklop.", "Čakam GPS fix", "Sledenje ustavljeno",
+        "Sled počiščena",
+        "Ni sporočil", "Kanal", "GPS kanal", "neprebranih",
+        "Odgovori", "Poslano", "Pošiljanje ni uspelo", "Ni GPS fix", "GPS lokacija",
+        "Že grem", "Da", "Ne", "Rabim pomoč", "Prispel", "Napiši sporočilo",
         "Zemljevid", "Ni lokacij", "Premakni za kalib.",
-        "Casovni pas",
+        "Časovni pas",
         "Prenos nastav.", "Deli profil", "Prejmi profil",
-        "Cakam prejemnika", "Iscem...", "Prenasam", "Koncano", "Napaka", "Izberi napravo",
+        "Čakam prejemnika", "Iščem...", "Prenašam", "Končano", "Napaka", "Izberi napravo",
         "Oglas (direkt)", "Oglas (poplava)", "Oglas poslan",
-        "Tocke", "+ Oznaci tukaj", "Ni tock", "Navigiraj", "Poslji", "Shrani", "Izbrisi",
-        "Tocke polne", "Tocka oznacena", "Tocka poslana", "Tocka izbrisana", "Shranjeno med tocke",
+        "Točke", "+ Označi tukaj", "Ni točk", "Navigiraj", "Pošlji", "Shrani", "Izbriši",
+        "Točke polne", "Točka označena", "Točka poslana", "Točka izbrisana", "Shranjeno med točke",
         "English", "Slovensko",
     };
     if (id >= T_COUNT) return "";

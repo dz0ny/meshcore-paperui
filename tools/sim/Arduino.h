@@ -14,4 +14,14 @@ using std::max;
 #define F(x) (x)     // Arduino flash-string macro → identity on host
 #endif
 
+#ifndef PROGMEM
+#define PROGMEM
+#endif
+#ifndef pgm_read_byte
+#define pgm_read_byte(a) (*(const uint8_t*)(a))
+#endif
+#ifndef pgm_read_word
+#define pgm_read_word(a) (*(const uint16_t*)(a))
+#endif
+
 uint32_t millis();   // defined in sim_display.cpp

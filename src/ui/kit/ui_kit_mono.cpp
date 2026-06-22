@@ -15,6 +15,7 @@
 #include "../../board_wio.h"
 #include <Arduino.h>
 #endif
+#include "lemon_font.h"      // Lemon GFXfont (Latin + Cyrillic) for node labels
 #include <cstdarg>
 #include <cstdio>
 #include <cstring>
@@ -92,17 +93,49 @@ static void add_child(Node* parent, Node* child) {
     c->next_sib = child;
 }
 
-// ---- font metrics (built-in 6x8 GFX font, integer-scaled) ------------------
-static int fsize(Font f) {
+// ---- font metrics & text (Lemon proportional GFXfont, UTF-8) ----------------
+// Node labels render in the Lemon font (Latin + Cyrillic, U+0020–U+04FF) so
+// Slovenian diacritics show properly. Each Font role is an integer scale of the
+// base glyph. The status bar keeps the 6x8 classic font (ASCII) and is painted
+// by the app, not through here.
+static int fscale(Font f) {
     switch (f) { case Font::Title: return 2; case Font::ClockLg: return 3; default: return 1; }
 }
-static int char_w(Font f) { return 6 * fsize(f); }
-static int line_h(Font f) { return 8 * fsize(f) + 2; }
+static int line_h(Font f) { return Lemon.yAdvance * fscale(f); }
+// Representative advance for column estimates (keyboard grid, rough caps). Lemon
+// is proportional, so real widths come from text_w(); this is just a stand-in.
+static int char_w(Font f) { return 6 * fscale(f); }
+
+// Decode one UTF-8 codepoint, advancing p past it. Stray bytes pass through as
+// Latin-1 so the stream never desyncs.
+static uint32_t utf8_next(const char*& p) {
+    uint8_t c = (uint8_t)*p++;
+    if (c < 0x80) return c;
+    if ((c & 0xE0) == 0xC0 && (p[0] & 0xC0) == 0x80) {
+        uint32_t cp = (uint32_t)(c & 0x1F) << 6; cp |= (*p++ & 0x3F); return cp;
+    }
+    if ((c & 0xF0) == 0xE0 && (p[0] & 0xC0) == 0x80 && (p[1] & 0xC0) == 0x80) {
+        uint32_t cp = (uint32_t)(c & 0x0F) << 12; cp |= (uint32_t)(*p++ & 0x3F) << 6; cp |= (*p++ & 0x3F); return cp;
+    }
+    return c;
+}
+
+// Glyph for a codepoint, falling back to '?' for anything outside Lemon's range.
+static const GFXglyph* glyph_for(uint32_t cp) {
+    if (cp < Lemon.first || cp > Lemon.last) cp = '?';
+    return &((const GFXglyph*)Lemon.glyph)[cp - Lemon.first];
+}
+
 static int text_w(const char* s, Font f) {
-    int maxc = 0, c = 0;
-    for (const char* p = s; *p; p++) { if (*p == '\n') { if (c > maxc) maxc = c; c = 0; } else c++; }
-    if (c > maxc) maxc = c;
-    return maxc * char_w(f);
+    int scale = fscale(f), best = 0;
+    const char* p = s;
+    while (*p) {
+        int w = 0;
+        while (*p && *p != '\n') { uint32_t cp = utf8_next(p); w += glyph_for(cp)->xAdvance * scale; }
+        if (w > best) best = w;
+        if (*p == '\n') p++;
+    }
+    return best;
 }
 static int text_lines(const char* s) { int n = 1; for (const char* p = s; *p; p++) if (*p == '\n') n++; return n; }
 static int text_h(const char* s, Font f) { return text_lines(s) * line_h(f); }
@@ -270,33 +303,49 @@ void   msg_append(Handle l, const char* sender, const char* text, bool is_self, 
     N(h)->w_spec = pct(100);       // span the list so the bar runs full width
 
     const char* body = text ? text : "";
-    int len = (int)strlen(body);
-    if (len == 0) return;
+    if (!*body) return;
 
     const Font body_font = Font::Title;            // 2x — fills the panel, e-ink readable
-    const int CAP = (int)sizeof(N(h)->text) - 1;   // label text buffer (39 usable)
-    int maxc = (display.width() - 4) / char_w(body_font);
-    if (maxc > CAP) maxc = CAP;
-    if (maxc < 1) maxc = 1;
+    const int CAP = (int)sizeof(N(h)->text) - 1;   // label text buffer (39 usable bytes)
+    const int scale = fscale(body_font);
+    const int maxpx = display.width() - 4;
 
-    // Labels don't word-wrap and the text buffer is fixed-size, so split the body
-    // into rows here, breaking on the last space within each window when possible.
-    int pos = 0;
-    while (pos < len) {
-        int remain = len - pos;
-        int take = remain < maxc ? remain : maxc;
-        if (take < remain) {
-            for (int i = take; i > 0; i--) {
-                if (body[pos + i] == ' ') { take = i; break; }
-            }
+    // Labels don't word-wrap and their buffer is fixed-size, so split the body
+    // into rows: greedily take whole codepoints (never splitting a UTF-8 glyph),
+    // break on the last space when the line overflows the panel or the buffer.
+    const char* p = body;
+    while (*p) {
+        const char* line_start = p;
+        const char* q = p;
+        const char* last_space = nullptr;   // byte just past a space (break here)
+        const char* fit_end = p;            // last codepoint boundary that fits
+        int w = 0;
+        while (*q) {
+            const char* cp_start = q;
+            uint32_t cp = utf8_next(q);
+            int adv = glyph_for(cp)->xAdvance * scale;
+            if ((int)(q - line_start) > CAP && cp_start > line_start) { q = cp_start; break; }
+            if (w + adv > maxpx && cp_start > line_start) { q = cp_start; break; }
+            w += adv;
+            fit_end = q;
+            if (cp == ' ') last_space = q;
         }
+        const char* line_end;
+        const char* next;
+        if (!*q)                                  { line_end = q; next = q; }
+        else if (last_space && last_space > line_start) { line_end = last_space - 1; next = last_space; }
+        else                                      { line_end = fit_end; next = fit_end; }
+
+        int seglen = (int)(line_end - line_start);
+        if (seglen <= 0) { p = fit_end > line_start ? fit_end : line_start + 1; continue; }
+        if (seglen > CAP) seglen = CAP;
         char seg[40];
-        memcpy(seg, body + pos, take);
-        seg[take] = 0;
+        memcpy(seg, line_start, seglen);
+        seg[seglen] = 0;
         Handle row = label(l, seg);
         N(row)->font = body_font;
-        pos += take;
-        while (pos < len && body[pos] == ' ') pos++;   // swallow the wrapped space
+        p = next;
+        while (*p == ' ') p++;   // swallow leading spaces on the wrapped line
     }
 }
 void msg_clear(Handle l) { if (l) N(l)->first_child = nullptr; }
@@ -441,20 +490,42 @@ static void layout(Node* n, int ox, int oy, int avail_w, int avail_h) {
 // ===========================================================================
 //  draw (called inside the GxEPD2 paged loop)
 // ===========================================================================
+// Blit one Lemon glyph: bitmap is bit-packed MSB-first, advancing a byte every
+// 8 bits (standard Adafruit GFXfont layout). Glyphs hang above the baseline.
+static void blit_glyph(const GFXglyph* g, int x, int baseline, int scale, uint16_t col) {
+    const uint8_t* bm = (const uint8_t*)Lemon.bitmap;
+    uint16_t bo = g->bitmapOffset;
+    uint8_t bits = 0; int bit = 0;
+    for (int yy = 0; yy < g->height; yy++) {
+        for (int xx = 0; xx < g->width; xx++) {
+            if ((bit++ & 7) == 0) bits = pgm_read_byte(&bm[bo++]);
+            if (bits & 0x80) {
+                int px = x + (g->xOffset + xx) * scale;
+                int py = baseline + (g->yOffset + yy) * scale;
+                if (scale == 1) display.drawPixel(px, py, col);
+                else            display.fillRect(px, py, scale, scale, col);
+            }
+            bits <<= 1;
+        }
+    }
+}
+
 static void draw_text(int x, int y, const char* s, Font f, bool invert) {
-    display.setTextSize(fsize(f));
-    display.setTextColor(invert ? cbg() : cfg());
-    int lh = line_h(f), cy = y;
+    int scale = fscale(f), lh = line_h(f);
+    uint16_t col = invert ? cbg() : cfg();
+    int baseline = y + 8 * scale;   // ~ascent; Lemon yOffsets are negative (above)
     const char* p = s;
-    char line[40]; int li = 0;
-    auto flush_line = [&]() {
-        line[li] = 0;
-        display.setCursor(x, cy + 1);
-        display.print(line);
-        cy += lh; li = 0;
-    };
-    for (; *p; p++) { if (*p == '\n') flush_line(); else if (li < 39) line[li++] = *p; }
-    flush_line();
+    while (*p) {
+        int cx = x;
+        while (*p && *p != '\n') {
+            uint32_t cp = utf8_next(p);
+            const GFXglyph* g = glyph_for(cp);
+            blit_glyph(g, cx, baseline, scale, col);
+            cx += g->xAdvance * scale;
+        }
+        if (*p == '\n') p++;
+        baseline += lh;
+    }
 }
 
 static void draw_node(Node* n) {

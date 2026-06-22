@@ -8,7 +8,9 @@
 #include "../../src/waypoint_store.h"
 #include "../../src/trail_store.h"
 #include "../../src/mesh/provision.h"
+#include "../../src/ui/i18n.h"
 #include <cstring>
+#include <cstdlib>
 
 // ---- model fixtures --------------------------------------------------------
 namespace model {
@@ -40,6 +42,11 @@ namespace model {
     void update_battery() {}
 
     void sim_seed() {
+        // Default to Slovenian so the sim exercises the Lemon font's diacritics;
+        // override with SIM_LANG=en.
+        const char* lang = getenv("SIM_LANG");
+        i18n::set_lang(lang && lang[0] == 'e' ? i18n::EN : i18n::SL);
+
         clock.hour = 10; clock.minute = 54;
         gps.has_fix = true; gps.satellites = 9;
         gps.lat = 46.05; gps.lng = 14.50;     // Ljubljana-ish, for team distances
