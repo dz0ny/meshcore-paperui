@@ -3,7 +3,7 @@
 // All page content is rendered client-side from the config blob the build step
 // injects as window.__FLASHER__ (see tools/build_web_flasher.py). Preact + htm
 // are pulled from esm.sh; esp-web-tools (a custom element) and the nRF52 Web
-// Serial DFU module (./nrf52-dfu.mjs) are loaded by the shell / imported here.
+// Serial DFU module (./nrf52-dfu.mjs) are loaded lazily, cache-busted by commit.
 
 import { h, render } from "https://esm.sh/preact@10.24.3";
 import {
@@ -12,10 +12,14 @@ import {
   useRef,
 } from "https://esm.sh/preact@10.24.3/hooks";
 import htm from "https://esm.sh/htm@3.1.1";
-import { wire as wireDfu } from "./nrf52-dfu.mjs";
 
 const html = htm.bind(h);
 const cfg = window.__FLASHER__ || { targets: [] };
+
+// Cache-bust query appended to sibling assets (nrf52-dfu.mjs, sim.js, sim_t5.js)
+// keyed to the build commit — see cache_bust_token() in build_web_flasher.py.
+// app.mjs itself is versioned by the <script> tag in flasher.html.
+const bust = cfg.cacheBust ? "?v=" + cfg.cacheBust : "";
 
 // Load a classic (non-module) script once, resolving when it has executed.
 const scriptCache = {};
@@ -87,7 +91,13 @@ function Uf2Action({ action, productUrl }) {
 function DfuAction({ action, productUrl }) {
   const root = useRef(null);
   useEffect(() => {
-    if (root.current) wireDfu(root.current);
+    let alive = true;
+    import("./nrf52-dfu.mjs" + bust).then(({ wire }) => {
+      if (alive && root.current) wire(root.current);
+    });
+    return () => {
+      alive = false;
+    };
   }, []);
   return html`<div class="space-y-4">
     <div
@@ -249,7 +259,7 @@ function T5Preview() {
       ];
     }
 
-    loadScript("sim_t5.js")
+    loadScript("sim_t5.js" + bust)
       .then(() => {
         if (typeof SimT5Module !== "function")
           throw new Error("sim_t5.js failed to load");
@@ -407,7 +417,7 @@ function WioPreview({ active }) {
       draw();
     }
 
-    loadScript("sim.js")
+    loadScript("sim.js" + bust)
       .then(() => {
         if (typeof SimModule !== "function")
           throw new Error("sim.js failed to load");

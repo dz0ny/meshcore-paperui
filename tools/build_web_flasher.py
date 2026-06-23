@@ -15,6 +15,7 @@ from __future__ import annotations
 import argparse
 import html
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -213,11 +214,35 @@ def build_target_config(target: dict, version: str) -> dict:
     }
 
 
+def cache_bust_token(version: str) -> str:
+    """Commit hash appended to local module URLs (app.mjs, nrf52-dfu.mjs, the sim
+    scripts) so a fresh deploy isn't served from the browser cache. The hash
+    changes whenever any asset does, which is exactly when a refetch is needed.
+    Prefer CI's $GITHUB_SHA; fall back to git, then to the build version."""
+    sha = os.environ.get("GITHUB_SHA")
+    if sha:
+        return sha[:7]
+    try:
+        out = subprocess.run(
+            ["git", "rev-parse", "--short", "HEAD"],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        if out.stdout.strip():
+            return out.stdout.strip()
+    except Exception:
+        pass
+    return version
+
+
 def build_page(version: str, repo_url: str) -> str:
+    bust = cache_bust_token(version)
     config = {
         "projectName": PROJECT_NAME,
         "repoUrl": repo_url,
         "version": version,
+        "cacheBust": bust,
         "features": [
             {"title": title, "desc": desc, "note": note}
             for (title, desc, note) in FEATURES
@@ -229,6 +254,7 @@ def build_page(version: str, repo_url: str) -> str:
     return load_template("flasher.html").substitute(
         project_name=html.escape(PROJECT_NAME),
         config=config_json,
+        cache_bust=bust,
     )
 
 
