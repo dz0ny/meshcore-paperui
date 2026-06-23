@@ -1,0 +1,5 @@
+build/
+build-wasm/
+web/sim_t5.js
+web/sim_t5.wasm
+*.png

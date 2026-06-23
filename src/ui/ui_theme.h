@@ -60,9 +60,6 @@ extern lv_style_t style_transparent;    // bg_opa=0, border=0, pad=0 containers
 
 // ---------- Font declarations ----------
 
-LV_FONT_DECLARE(lv_font_noto_14);               // T-Deck statusbar, small text
-LV_FONT_DECLARE(lv_font_noto_15);               // T-Deck nav/back button
-LV_FONT_DECLARE(lv_font_noto_16);               // T-Deck titles, menu labels
 LV_FONT_DECLARE(lv_font_noto_24);               // statusbar, sender names
 LV_FONT_DECLARE(lv_font_noto_28);               // message text, values
 LV_FONT_DECLARE(lv_font_montserrat_bold_30);    // menus, titles, settings
@@ -71,8 +68,4 @@ LV_FONT_DECLARE(lv_font_montserrat_bold_120);   // home screen clock
 
 // ---------- Per-device layout ----------
 
-#if defined(BOARD_TDECK)
-#include "layout/tdeck.h"
-#else
 #include "layout/epaper.h"
-#endif

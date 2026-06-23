@@ -40,9 +40,6 @@ jobs:
           version: latest
           actions-cache-folder: emsdk-cache
 
-      - name: Build interactive UI preview (WASM)
-        run: tools/sim/build_web.sh
-
       - name: Cache PlatformIO
         uses: actions/cache@v4
         with:

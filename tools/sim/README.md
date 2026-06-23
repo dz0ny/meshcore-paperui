@@ -1,9 +1,25 @@
-# Mono UI screen simulator (native)
+# UI screen simulators (native + WASM)
 
-Render the **real** Wio mono screens on your host as PNGs — no hardware, no
-flashing. It compiles the actual `ui::kit` mono engine (`ui_kit_mono.cpp`) and
-the actual screen code, swapping only the hardware layer (GxEPD2 panel → an
-in-memory buffer) and the data layer (model / mesh → small fixtures).
+Two simulators run the **real** UI on your host — no hardware, no flashing:
+
+- **Mono (Wio)** — this directory. Compiles the `ui::kit` mono engine
+  (`ui_kit_mono.cpp`) + screens, swapping the GxEPD2 panel for an in-memory
+  buffer and the model/mesh for fixtures. See below.
+- **LVGL (T5 ePaper)** — [`t5/`](t5/). Compiles LVGL v9 + `ui_kit_lvgl.cpp` +
+  the real screen manager, theme, components and screens, swapping the epdiy
+  panel for a software-rendered L8 framebuffer and stubbing model/mesh/board.
+  `t5/build_t5.sh` renders screens to PNG; `t5/build_t5_web.sh` builds an
+  interactive WASM build (touch-driven) for the browser. See [`t5/README.md`](t5/README.md).
+
+Both back a **Live preview** section in the web flasher (Wio = joystick keys,
+T5 = touch) and the screenshot galleries (`tools/gen_wio_shots.sh`,
+`tools/gen_t5_shots.sh`).
+
+## Mono (Wio) — render the real mono screens to PNG
+
+It compiles the actual `ui::kit` mono engine (`ui_kit_mono.cpp`) and the actual
+screen code, swapping only the hardware layer (GxEPD2 panel → an in-memory
+buffer) and the data layer (model / mesh → small fixtures).
 
 ```sh
 tools/sim/build.sh

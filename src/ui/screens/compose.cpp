@@ -16,15 +16,11 @@ namespace ui::screen::compose {
 static lv_obj_t* scr = NULL;
 static lv_obj_t* recipient_list = NULL;
 static lv_obj_t* recipient_list_area = NULL;
-static lv_obj_t* recipient_card = NULL;
-static lv_obj_t* lbl_to = NULL;
-static lv_obj_t* lbl_hint = NULL;
 static lv_obj_t* ta = NULL;
 static lv_obj_t* kb = NULL;
 static lv_obj_t* send_btn = NULL;
 static lv_obj_t* editor_card = NULL;
 static lv_obj_t* char_count = NULL;
-static lv_obj_t* lbl_filter = NULL;
 static lv_obj_t* picker_panel = NULL;
 static lv_obj_t* editor_panel = NULL;
 static lv_obj_t* picker_card = NULL;
@@ -51,18 +47,6 @@ enum PickFilter {
 };
 
 static PickFilter current_filter = PICK_FILTER_PEOPLE;
-
-static const char* filter_name(PickFilter filter) {
-    switch (filter) {
-        case PICK_FILTER_FAVORITES:
-            return "Favorites";
-        case PICK_FILTER_CHANNELS:
-            return "Channels";
-        case PICK_FILTER_PEOPLE:
-        default:
-            return "People";
-    }
-}
 
 // Contact/channel list for picker
 struct PickEntry {
@@ -131,7 +115,6 @@ static void focus_picker_target() {
         return;
     }
 
-#ifndef BOARD_TDECK
     for (int i = 0; i < 3; i++) {
         if (filter_tabs[i] && lv_obj_is_valid(filter_tabs[i]) && lv_obj_is_visible(filter_tabs[i])) {
             focus_obj(filter_tabs[i]);
@@ -142,7 +125,6 @@ static void focus_picker_target() {
     if (picker_panel) {
         focus_obj(find_first_visible_target(picker_panel));
     }
-#endif
 }
 
 static void focus_editor_target() {
@@ -183,11 +165,6 @@ static void restore_refresh_mode() {
 }
 
 static void sync_filter_nav() {
-#ifdef BOARD_TDECK
-    if (lbl_filter) {
-        lv_label_set_text(lbl_filter, filter_name(current_filter));
-    }
-#else
     for (int i = 0; i < 3; i++) {
         bool active = current_filter == (PickFilter)i;
         if (filter_tabs[i]) {
@@ -200,22 +177,9 @@ static void sync_filter_nav() {
                                         lv_color_hex(active ? EPD_COLOR_BG : EPD_COLOR_TEXT), LV_PART_MAIN);
         }
     }
-#endif
 }
 
 static void update_recipient_card() {
-#ifdef BOARD_TDECK
-    if (!lbl_to || !lbl_hint) return;
-
-    if (recipient_chosen) {
-        static char to_buf[40];
-        snprintf(to_buf, sizeof(to_buf), "To: %s", recipient_name);
-        lv_label_set_text(lbl_to, to_buf);
-    } else {
-        lv_label_set_text(lbl_to, "To: Choose");
-    }
-    lv_label_set_text(lbl_hint, "");
-#else
     if (picker_lbl_to) {
         lv_label_set_text(picker_lbl_to, recipient_chosen ? recipient_name : "Choose recipient");
     }
@@ -225,7 +189,6 @@ static void update_recipient_card() {
     if (editor_lbl_to) {
         lv_label_set_text(editor_lbl_to, recipient_chosen ? recipient_name : "Choose recipient");
     }
-#endif
 }
 
 static void update_char_count() {
@@ -311,21 +274,6 @@ static void set_filter(PickFilter filter) {
     }
 }
 
-static void on_filter_cycle(lv_event_t* e) {
-    switch (current_filter) {
-        case PICK_FILTER_FAVORITES:
-            set_filter(PICK_FILTER_CHANNELS);
-            break;
-        case PICK_FILTER_CHANNELS:
-            set_filter(PICK_FILTER_PEOPLE);
-            break;
-        case PICK_FILTER_PEOPLE:
-        default:
-            set_filter(PICK_FILTER_FAVORITES);
-            break;
-    }
-}
-
 static void on_filter_pick(lv_event_t* e) {
     int idx = (int)(intptr_t)lv_event_get_user_data(e);
     if (idx < PICK_FILTER_FAVORITES || idx > PICK_FILTER_PEOPLE) return;
@@ -337,15 +285,8 @@ static void show_editor() {
     update_char_count();
     sync_picker_ui();
 
-#ifdef BOARD_TDECK
-    if (recipient_list_area) lv_obj_add_flag(recipient_list_area, LV_OBJ_FLAG_HIDDEN);
-    if (editor_card) lv_obj_clear_flag(editor_card, LV_OBJ_FLAG_HIDDEN);
-    if (send_btn) lv_obj_clear_flag(send_btn, LV_OBJ_FLAG_HIDDEN);
-    if (ta) lv_obj_clear_flag(ta, LV_OBJ_FLAG_HIDDEN);
-#else
     if (picker_panel) lv_obj_add_flag(picker_panel, LV_OBJ_FLAG_HIDDEN);
     if (editor_panel) lv_obj_clear_flag(editor_panel, LV_OBJ_FLAG_HIDDEN);
-#endif
 
     ui::port::keyboard_focus_invalidate();
     focus_editor_target();
@@ -363,36 +304,20 @@ static void show_picker() {
     update_recipient_card();
     sync_picker_ui();
 
-#ifdef BOARD_TDECK
-    if (recipient_list_area) lv_obj_clear_flag(recipient_list_area, LV_OBJ_FLAG_HIDDEN);
-    if (editor_card) lv_obj_add_flag(editor_card, LV_OBJ_FLAG_HIDDEN);
-    if (ta) lv_obj_add_flag(ta, LV_OBJ_FLAG_HIDDEN);
-    if (send_btn) lv_obj_add_flag(send_btn, LV_OBJ_FLAG_HIDDEN);
-    if (kb) lv_obj_add_flag(kb, LV_OBJ_FLAG_HIDDEN);
-#else
     if (picker_panel) lv_obj_clear_flag(picker_panel, LV_OBJ_FLAG_HIDDEN);
     if (editor_panel) lv_obj_add_flag(editor_panel, LV_OBJ_FLAG_HIDDEN);
-#endif
 
     ui::port::keyboard_focus_invalidate();
     focus_picker_target();
 }
 
 static void sync_picker_ui() {
-#ifdef BOARD_TDECK
-    if (recipient_chosen) {
-        lbl_filter = ui::screen_mgr::set_nav_action(NULL, NULL, NULL);
-    } else {
-        lbl_filter = ui::screen_mgr::set_nav_action(filter_name(current_filter), on_filter_cycle, NULL);
-    }
-#else
     if (!filter_row) return;
     if (recipient_chosen) {
         lv_obj_add_flag(filter_row, LV_OBJ_FLAG_HIDDEN);
     } else {
         lv_obj_clear_flag(filter_row, LV_OBJ_FLAG_HIDDEN);
     }
-#endif
 }
 
 static void load_entries() {
@@ -469,7 +394,6 @@ static void render_recipient_list() {
     ui::port::keyboard_focus_invalidate();
 }
 
-#ifndef BOARD_TDECK
 static lv_obj_t* create_full_panel(lv_obj_t* parent) {
     lv_obj_t* panel = lv_obj_create(parent);
     lv_obj_set_size(panel, lv_pct(100), lv_pct(100));
@@ -707,7 +631,6 @@ static void create_epaper_editor_panel(lv_obj_t* parent) {
     send_btn = ui::nav::text_button(editor_panel, "Send", on_send, NULL);
     lv_obj_align(send_btn, LV_ALIGN_BOTTOM_MID, 0, compose_send_bottom());
 }
-#endif
 
 static void create(ui::kit::Handle parent_kit) {
     lv_obj_t* parent = (lv_obj_t*)parent_kit;
@@ -715,132 +638,8 @@ static void create(ui::kit::Handle parent_kit) {
     lv_obj_clear_flag(parent, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_set_scrollbar_mode(parent, LV_SCROLLBAR_MODE_OFF);
 
-#ifdef BOARD_TDECK
-    recipient_card = lv_obj_create(parent);
-    lv_obj_set_size(recipient_card, lv_pct(95), UI_COMPOSE_RECIPIENT_H);
-    lv_obj_align(recipient_card, LV_ALIGN_TOP_MID, 0, UI_COMPOSE_RECIPIENT_Y);
-    lv_obj_set_style_bg_color(recipient_card, lv_color_hex(EPD_COLOR_BG), LV_PART_MAIN);
-    lv_obj_set_style_border_width(recipient_card, UI_BORDER_CARD, LV_PART_MAIN);
-    lv_obj_set_style_border_color(recipient_card, lv_color_hex(EPD_COLOR_BORDER), LV_PART_MAIN);
-    lv_obj_set_style_radius(recipient_card, 6, LV_PART_MAIN);
-    lv_obj_set_style_pad_hor(recipient_card, 6, LV_PART_MAIN);
-    lv_obj_set_style_pad_ver(recipient_card, 4, LV_PART_MAIN);
-    lv_obj_clear_flag(recipient_card, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_add_flag(recipient_card, LV_OBJ_FLAG_CLICKABLE);
-    lv_obj_add_event_cb(recipient_card, on_recipient_click, LV_EVENT_CLICKED, NULL);
-    lv_obj_set_ext_click_area(recipient_card, 15);
-    ui::port::keyboard_focus_register(recipient_card);
-
-    lbl_to = lv_label_create(recipient_card);
-    lv_obj_set_width(lbl_to, lv_pct(85));
-    lv_obj_set_style_text_font(lbl_to, UI_FONT_BODY, LV_PART_MAIN);
-    lv_obj_set_style_text_color(lbl_to, lv_color_hex(EPD_COLOR_TEXT), LV_PART_MAIN);
-    lv_label_set_long_mode(lbl_to, LV_LABEL_LONG_DOT);
-    lv_obj_align(lbl_to, LV_ALIGN_LEFT_MID, 0, 0);
-
-    lv_obj_t* recipient_arrow = lv_label_create(recipient_card);
-    lv_obj_set_style_text_font(recipient_arrow, UI_FONT_SMALL, LV_PART_MAIN);
-    lv_obj_set_style_text_color(recipient_arrow, lv_color_hex(EPD_COLOR_TEXT), LV_PART_MAIN);
-    lv_label_set_text(recipient_arrow, LV_SYMBOL_RIGHT);
-    lv_obj_align(recipient_arrow, LV_ALIGN_RIGHT_MID, 0, 0);
-
-    lbl_hint = lv_label_create(recipient_card);
-    lv_obj_set_width(lbl_hint, lv_pct(92));
-    lv_obj_set_style_text_font(lbl_hint, UI_FONT_SMALL, LV_PART_MAIN);
-    lv_obj_set_style_text_color(lbl_hint, lv_color_hex(EPD_COLOR_TEXT), LV_PART_MAIN);
-    lv_label_set_long_mode(lbl_hint, LV_LABEL_LONG_DOT);
-    lv_obj_add_flag(lbl_hint, LV_OBJ_FLAG_HIDDEN);
-
-    recipient_list_area = lv_obj_create(parent);
-    lv_obj_update_layout(parent);
-    lv_coord_t picker_height = lv_obj_get_content_height(parent) - UI_COMPOSE_LIST_Y;
-    if (picker_height < 0) {
-        picker_height = 0;
-    }
-    lv_obj_set_size(recipient_list_area, lv_pct(95), picker_height);
-    lv_obj_align(recipient_list_area, LV_ALIGN_TOP_MID, 0, UI_COMPOSE_LIST_Y);
-    lv_obj_set_style_bg_opa(recipient_list_area, LV_OPA_0, LV_PART_MAIN);
-    lv_obj_set_style_border_width(recipient_list_area, 0, LV_PART_MAIN);
-    lv_obj_set_style_pad_all(recipient_list_area, 0, LV_PART_MAIN);
-    lv_obj_clear_flag(recipient_list_area, LV_OBJ_FLAG_SCROLLABLE);
-
-    recipient_list = lv_obj_create(recipient_list_area);
-    lv_obj_set_size(recipient_list, lv_pct(100), lv_pct(100));
-    lv_obj_align(recipient_list, LV_ALIGN_TOP_MID, 0, 0);
-    lv_obj_set_style_bg_opa(recipient_list, LV_OPA_0, LV_PART_MAIN);
-    lv_obj_set_style_border_width(recipient_list, 0, LV_PART_MAIN);
-    ui::theme::style_scrollbar_hint(recipient_list);
-    lv_obj_set_style_pad_all(recipient_list, 0, LV_PART_MAIN);
-    lv_obj_set_flex_flow(recipient_list, LV_FLEX_FLOW_COLUMN);
-    lv_obj_clear_flag(recipient_list, (lv_obj_flag_t)(LV_OBJ_FLAG_SCROLL_ELASTIC | LV_OBJ_FLAG_SCROLL_MOMENTUM));
-
-    editor_card = lv_obj_create(parent);
-    lv_obj_set_size(editor_card, lv_pct(95), UI_COMPOSE_EDITOR_H);
-    lv_obj_align(editor_card, LV_ALIGN_TOP_MID, 0, UI_COMPOSE_EDITOR_Y);
-    lv_obj_set_style_bg_opa(editor_card, LV_OPA_0, LV_PART_MAIN);
-    lv_obj_set_style_border_width(editor_card, 0, LV_PART_MAIN);
-    lv_obj_set_style_pad_all(editor_card, 0, LV_PART_MAIN);
-    lv_obj_clear_flag(editor_card, LV_OBJ_FLAG_SCROLLABLE);
-
-    lv_obj_t* msg_title = lv_label_create(editor_card);
-    lv_obj_set_style_text_font(msg_title, UI_FONT_SMALL, LV_PART_MAIN);
-    lv_obj_set_style_text_color(msg_title, lv_color_hex(EPD_COLOR_TEXT), LV_PART_MAIN);
-    lv_label_set_text(msg_title, "Message");
-    lv_obj_align(msg_title, LV_ALIGN_LEFT_MID, 0, 0);
-
-    char_count = lv_label_create(editor_card);
-    lv_obj_set_style_text_font(char_count, UI_FONT_SMALL, LV_PART_MAIN);
-    lv_obj_set_style_text_color(char_count, lv_color_hex(EPD_COLOR_TEXT), LV_PART_MAIN);
-    lv_label_set_text(char_count, "0/150");
-    lv_obj_align(char_count, LV_ALIGN_RIGHT_MID, 0, 0);
-
-    ta = lv_textarea_create(parent);
-    lv_obj_set_size(ta, lv_pct(95), UI_COMPOSE_TA_H);
-    lv_obj_align(ta, LV_ALIGN_TOP_MID, 0, UI_COMPOSE_TA_Y);
-    lv_textarea_set_placeholder_text(ta, "Write a short message");
-    lv_textarea_set_max_length(ta, 150);
-    lv_textarea_set_one_line(ta, false);
-    lv_obj_set_style_text_font(ta, UI_FONT_BODY, LV_PART_MAIN);
-    lv_obj_set_style_text_color(ta, lv_color_hex(EPD_COLOR_TEXT), LV_PART_MAIN);
-    lv_obj_set_style_bg_color(ta, lv_color_hex(EPD_COLOR_BG), LV_PART_MAIN);
-    lv_obj_set_style_border_color(ta, lv_color_hex(EPD_COLOR_BORDER), LV_PART_MAIN);
-    lv_obj_set_style_border_width(ta, UI_BORDER_THIN, LV_PART_MAIN);
-    lv_obj_set_style_radius(ta, 6, LV_PART_MAIN);
-    lv_obj_set_style_pad_all(ta, 4, LV_PART_MAIN);
-    lv_obj_set_style_anim_duration(ta, 0, LV_PART_CURSOR);
-    lv_obj_add_event_cb(ta, on_ta_focus, LV_EVENT_FOCUSED, NULL);
-    lv_obj_add_event_cb(ta, on_ta_blur, LV_EVENT_DEFOCUSED, NULL);
-    lv_obj_add_event_cb(ta, on_ta_change, LV_EVENT_VALUE_CHANGED, NULL);
-    ui::port::keyboard_focus_register(ta);
-
-#if UI_COMPOSE_SHOW_KB
-    if (!board::peri_status[E_PERI_KEYBOARD]) {
-        kb = lv_keyboard_create(parent);
-        lv_keyboard_set_textarea(kb, ta);
-        lv_buttonmatrix_clear_button_ctrl_all(kb, LV_BUTTONMATRIX_CTRL_CLICK_TRIG);
-        lv_buttonmatrix_set_button_ctrl_all(kb, LV_BUTTONMATRIX_CTRL_NO_REPEAT);
-        lv_obj_set_size(kb, lv_pct(100), 320);
-        lv_obj_align(kb, LV_ALIGN_BOTTOM_MID, 0, 0);
-        lv_obj_set_style_text_font(kb, UI_FONT_TITLE, LV_PART_MAIN);
-        lv_obj_set_style_bg_color(kb, lv_color_hex(EPD_COLOR_BG), LV_PART_MAIN);
-        lv_obj_set_style_text_color(kb, lv_color_hex(EPD_COLOR_TEXT), LV_PART_MAIN);
-        lv_obj_set_style_anim_duration(kb, 0, LV_PART_MAIN);
-        lv_obj_set_style_bg_color(kb, lv_color_hex(EPD_COLOR_BG), LV_PART_ITEMS);
-        lv_obj_set_style_text_color(kb, lv_color_hex(EPD_COLOR_TEXT), LV_PART_ITEMS);
-        lv_obj_set_style_border_color(kb, lv_color_hex(EPD_COLOR_BORDER), LV_PART_ITEMS);
-        lv_obj_set_style_border_width(kb, UI_BORDER_THIN, LV_PART_ITEMS);
-        lv_obj_set_style_radius(kb, 10, LV_PART_ITEMS);
-        lv_obj_set_style_anim_duration(kb, 0, LV_PART_ITEMS);
-        lv_obj_add_event_cb(kb, on_kb_event, LV_EVENT_ALL, NULL);
-    }
-#endif
-
-    send_btn = ui::nav::text_button(parent, "Send", on_send, NULL);
-    lv_obj_align(send_btn, LV_ALIGN_BOTTOM_MID, 0, UI_COMPOSE_SEND_BOTTOM);
-#else
     create_epaper_picker_panel(parent);
     create_epaper_editor_panel(parent);
-#endif
 
     model::refresh_contacts();
     load_entries();
@@ -875,15 +674,11 @@ static void destroy() {
     scr = NULL;
     recipient_list = NULL;
     recipient_list_area = NULL;
-    recipient_card = NULL;
-    lbl_to = NULL;
-    lbl_hint = NULL;
     ta = NULL;
     kb = NULL;
     send_btn = NULL;
     editor_card = NULL;
     char_count = NULL;
-    lbl_filter = NULL;
     picker_panel = NULL;
     editor_panel = NULL;
     picker_card = NULL;

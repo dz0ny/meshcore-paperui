@@ -53,19 +53,6 @@ static lv_obj_t* card_state_pills[MAX_CONTACTS] = {};
 static lv_obj_t* card_state_labels[MAX_CONTACTS] = {};
 static bool row_visible[MAX_CONTACTS] = {};
 
-#ifdef BOARD_TDECK
-static const lv_coord_t SENSOR_CARD_RADIUS = 10;
-static const lv_coord_t SENSOR_CARD_PAD = 6;
-static const lv_coord_t SENSOR_CARD_ROW_PAD = 4;
-static const lv_coord_t SENSOR_HEADER_GAP = 6;
-static const lv_coord_t SENSOR_STATE_PAD_H = 8;
-static const lv_coord_t SENSOR_STATE_PAD_V = 2;
-static const lv_coord_t SENSOR_METRICS_GAP = 4;
-static const lv_coord_t SENSOR_METRIC_PAD_H = 6;
-static const lv_coord_t SENSOR_METRIC_PAD_V = 4;
-static const lv_coord_t SENSOR_METRIC_ROW_PAD = 1;
-static const int SENSOR_NAME_WIDTH = 70;
-#else
 static const lv_coord_t SENSOR_CARD_RADIUS = 20;
 static const lv_coord_t SENSOR_CARD_PAD = 12;
 static const lv_coord_t SENSOR_CARD_ROW_PAD = 8;
@@ -77,7 +64,6 @@ static const lv_coord_t SENSOR_METRIC_PAD_H = 10;
 static const lv_coord_t SENSOR_METRIC_PAD_V = 8;
 static const lv_coord_t SENSOR_METRIC_ROW_PAD = 2;
 static const int SENSOR_NAME_WIDTH = 76;
-#endif
 
 static void decode_telemetry(SensorCard& card, const uint8_t* data, uint8_t len, uint32_t timestamp = 0);
 static void ensure_row(int idx);

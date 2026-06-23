@@ -143,8 +143,6 @@ screen_lifecycle_t lifecycle = { create, entry, exit_fn, destroy };
 #include "../ui_screen_mgr.h"
 #include "../ui_port.h"
 #include "../kit/ui_kit.h"
-#include "../components/statusbar.h"
-#include "../components/toast.h"
 #include "../../nvs_param.h"
 #include "../../model.h"
 
@@ -156,18 +154,9 @@ static Handle lbl_refresh_val = nullptr;
 static Handle lbl_backlight_val = nullptr;
 static Handle lbl_brightness_val = nullptr;
 static Handle lbl_sleep_val = nullptr;
-static Handle lbl_theme_val = nullptr;
 static const char* mode_names[] = {"Normal", "Fast"};
 static const char* sleep_names[] = {"Off", "1 min", "2 min", "5 min", "15 min", "30 min"};
 static const uint32_t sleep_ms[] = {0, 60000, 120000, 300000, 900000, 1800000};
-
-static void apply_theme_async(void* data) {
-    (void)data;
-    ui::toast::destroy();
-    ui::statusbar::recreate();
-    ui::screen_mgr::reload_stack();
-    ui::toast::show(ui::theme::current_name());
-}
 
 static void on_sleep_cycle(void*) {
     uint8_t idx = (model::sleep_cfg.timeout_idx + 1) % 6;
@@ -202,24 +191,11 @@ static void on_brightness_cycle(void*) {
     if (lbl_brightness_val) set_text(lbl_brightness_val, ui::port::get_brightness_name());
 }
 
-static void on_theme_cycle(void*) {
-    ui::theme::theme_id next_theme = ui::theme::next();
-    if (!ui::theme::set(next_theme)) return;
-
-    nvs_param_set_u8(NVS_ID_UI_THEME, static_cast<uint8_t>(next_theme));
-    defer(apply_theme_async, nullptr);
-}
-
 static void create(Handle parent) {
     Handle lst = list(parent);
 
 #ifdef BOARD_EPAPER
     lbl_refresh_val = toggle_item(lst, "Refresh", mode_names[ui::port::get_refresh_mode()], on_refresh_mode, nullptr);
-#endif
-#ifdef BOARD_TDECK
-    lbl_theme_val = toggle_item(lst, "Theme", ui::theme::current_name(), on_theme_cycle, nullptr);
-#endif
-#ifdef BOARD_EPAPER
     lbl_backlight_val = toggle_item(lst, "Light", ui::port::get_backlight_name(), on_backlight_cycle, nullptr);
 #endif
     lbl_brightness_val = toggle_item(lst, "Brightness", ui::port::get_brightness_name(), on_brightness_cycle, nullptr);
@@ -233,7 +209,6 @@ static void destroy() {
     lbl_backlight_val = nullptr;
     lbl_brightness_val = nullptr;
     lbl_sleep_val = nullptr;
-    lbl_theme_val = nullptr;
 }
 
 screen_lifecycle_t lifecycle = { create, entry, exit_fn, destroy };

@@ -409,7 +409,7 @@ void keyboard_open(const char* initial, int max_len, TextCb cb, void* user) {
     lv_obj_set_style_anim_duration(kb, 0, LV_PART_MAIN);
     lv_obj_add_event_cb(kb, kb_event, LV_EVENT_ALL, nullptr);
 #else
-    // Physical-keyboard panels (T-Deck): no on-screen keyboard widget. The
+    // Physical-keyboard panels: no on-screen keyboard widget. The
     // textarea takes hardware key input; Enter confirms (READY), Esc cancels.
     lv_textarea_set_one_line(g_kb_ta, true);
     lv_obj_add_event_cb(g_kb_ta, kb_event, LV_EVENT_ALL, nullptr);

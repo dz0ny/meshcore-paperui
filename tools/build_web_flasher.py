@@ -51,7 +51,7 @@ TARGETS = [
         "screen_max_w": "31rem",
         # Embed the interactive WASM build of the mono UI (tools/sim/build_web.sh)
         # as a live "Live preview" section in this panel.
-        "preview": True,
+        "preview": "wio",
         "screenshots": [
             ("wio-chat.png", "Messages", "Read and reply to mesh messages on the mono e-ink display."),
             ("wio-team.png", "Team", "Roster of nearby team members with their last-heard status."),
@@ -76,24 +76,21 @@ TARGETS = [
         # Portrait 540x960 e-paper renders — cap the stage so they show roughly
         # device-sized instead of stretching to the full column width.
         "screen_max_w": "17rem",
+        # Rendered by the native LVGL simulator (tools/gen_t5_shots.sh) — the real
+        # on-device screens on mock data, not device photos.
+        "preview": "t5",
         "screenshots": [
-            ("compose.jpeg", "Compose", "Write and send a message to a contact or channel using the on-screen keyboard."),
-            ("contact.jpeg", "Contacts", "Your saved mesh contacts — tap one to open its conversation."),
-            ("map.jpeg", "Map", "Plots heard node positions and your own GPS fix on an offline tile map."),
-            ("sensors.jpeg", "Sensors", "Live telemetry: battery, GPS lock, and environment readings."),
+            ("t5-home.png", "Home", "Big clock, GPS + battery, unread count, and the main menu."),
+            ("t5-chat.png", "Messages", "Read and reply to a conversation with the on-screen keyboard."),
+            ("t5-contacts.png", "Contacts", "Saved mesh contacts — favorites first; tap to open a chat."),
+            ("t5-compose.png", "Compose", "Write a new message to a contact or channel."),
+            ("t5-gps.png", "GPS", "Fix quality, satellite count, coordinates, altitude, and speed."),
+            ("t5-battery.png", "Battery", "Charge, voltage, current, and charger status."),
+            ("t5-mesh.png", "Mesh", "Radio config and live link stats (peers, RSSI, SNR)."),
+            ("t5-trail.png", "Trail", "GPS breadcrumb track with live distance, time, and pace."),
+            ("t5-compass.png", "Compass", "Bearing and distance to a selected waypoint or contact."),
+            ("t5-waypoints.png", "Waypoints", "Saved locations and shared points of interest."),
         ],
-    },
-    {
-        "env": "tdeck",
-        "slug": "tdeck",
-        "device_name": "LilyGo T-Deck",
-        "tab_label": "T-Deck",
-        "flash_method": "esp-web-tools",
-        "chip_label": CHIP_FAMILY,
-        "description": "Flash the latest PlatformIO build for the LilyGo T-Deck directly from Chrome or Edge with ESP Web Tools. It works as both a standalone mesh device and a companion-connected MeshCore node.",
-        "product_url": "https://lilygo.cc/en-us/products/t-deck",
-        "product_image": None,
-        "screenshots": [],
     },
 ]
 
@@ -233,8 +230,11 @@ def build_target_panel(target: dict, version: str, active: bool) -> str:
             product_link=product_link,
         )
 
-    # Interactive WASM preview (mono UI) — only where the build provides it.
-    preview_html = load_template("fragment_preview.html").template if target.get("preview") else ""
+    # Interactive WASM preview — fragment per device family ("wio" mono, "t5" LVGL).
+    preview = target.get("preview")
+    preview_html = ""
+    if preview:
+        preview_html = load_template(f"fragment_preview_{preview}.html").template
 
     return load_template("flasher_panel.html").substitute(
         slug=slug,
@@ -381,19 +381,24 @@ def main() -> None:
             if img_path.is_file():
                 shutil.copy2(img_path, target_dir / name)
 
-    # Build + ship the interactive WASM mono-UI preview if any target wants it.
-    if any(t.get("preview") for t in TARGETS):
-        sim_dir = Path(__file__).resolve().parent / "sim"
-        build_web = sim_dir / "build_web.sh"
-        sim_js = sim_dir / "web" / "sim.js"
-        sim_wasm = sim_dir / "web" / "sim.wasm"
-        if not (sim_js.is_file() and sim_wasm.is_file()):
-            # Compile with Emscripten (build_web.sh errors clearly if em++ is absent).
-            run(["bash", str(build_web)])
-        for path in (sim_js, sim_wasm):
+    # Build + ship each interactive WASM preview a target asks for. "wio" is the
+    # mono UI (tools/sim/build_web.sh -> sim.js); "t5" is the LVGL UI
+    # (tools/sim/t5/build_t5_web.sh -> sim_t5.js). Compiled with Emscripten; the
+    # build scripts error clearly if em++ is absent.
+    tools = Path(__file__).resolve().parent
+    PREVIEW_BUILDS = {
+        "wio": (tools / "sim" / "build_web.sh", tools / "sim" / "web", ("sim.js", "sim.wasm")),
+        "t5":  (tools / "sim" / "t5" / "build_t5_web.sh", tools / "sim" / "t5" / "web", ("sim_t5.js", "sim_t5.wasm")),
+    }
+    for kind in {t.get("preview") for t in TARGETS if t.get("preview")}:
+        script, web_dir, artifacts = PREVIEW_BUILDS[kind]
+        if not all((web_dir / a).is_file() for a in artifacts):
+            run(["bash", str(script)])
+        for a in artifacts:
+            path = web_dir / a
             if not path.is_file():
                 raise FileNotFoundError(path)
-            shutil.copy2(path, output_dir / path.name)
+            shutil.copy2(path, output_dir / a)
 
     # Ship the Web Serial nRF52 DFU flasher module alongside the page.
     if any(t.get("flash_method") == "web-serial-dfu" for t in TARGETS):

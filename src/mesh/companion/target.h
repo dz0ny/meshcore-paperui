@@ -20,7 +20,7 @@
   extern EnvironmentSensorManager sensors;
   extern MicroNMEALocationProvider gps_provider;
 #else
-  // ESP32 boards (T5 e-paper / T-Deck)
+  // ESP32 boards (T5 e-paper)
   #include <helpers/ESP32Board.h>
   class T5ePaperBoard : public ESP32Board {
   public:

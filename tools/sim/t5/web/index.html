@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>meshui — T5 ePaper UI simulator</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { font: 14px/1.4 system-ui, sans-serif; margin: 0; padding: 20px;
+         display: flex; flex-direction: column; align-items: center; gap: 16px;
+         background: #1a1a1a; color: #ddd; }
+  h1 { font-size: 16px; font-weight: 600; margin: 0; color: #fff; }
+  .panel { background: #2a2a2a; border-radius: 10px; padding: 14px;
+           display: flex; flex-direction: column; gap: 12px; align-items: center; }
+  canvas { width: 270px; height: auto; background: #fff; border: 1px solid #444;
+           border-radius: 6px; cursor: pointer; touch-action: none; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; align-items: center; }
+  button, select { font: inherit; background: #3a3a3a; color: #eee; border: 1px solid #555;
+                   border-radius: 6px; padding: 7px 12px; cursor: pointer; }
+  button:hover { background: #4a4a4a; }
+  .hint { color: #888; font-size: 12px; max-width: 460px; text-align: center; }
+</style>
+</head>
+<body>
+  <h1>meshui — T5 ePaper UI simulator (LVGL, WASM)</h1>
+  <div class="row">
+    <label>Jump to <select id="goto"></select></label>
+    <label>Lang
+      <select id="lang"><option value="0">EN</option><option value="1">SL</option></select>
+    </label>
+    <button id="reset">Reset</button>
+  </div>
+  <div class="panel">
+    <canvas id="screen" width="540" height="960"></canvas>
+  </div>
+  <p class="hint">Tap and drag the screen like the real touchscreen. Mock data from <code>model::sim_seed</code>.</p>
+
+<script src="sim_t5.js"></script>
+<script>
+const SCREENS = [
+  [0,"Home"],[1,"Contacts"],[2,"Messages"],[3,"Settings"],[8,"Display"],
+  [9,"GPS settings"],[10,"Mesh settings"],[15,"Bluetooth"],[4,"GPS"],[5,"Battery"],
+  [6,"Mesh"],[7,"Status"],[25,"Trail"],[29,"Team"],[35,"Waypoints"],[12,"Lock"],
+];
+const canvas = document.getElementById("screen");
+const ctx = canvas.getContext("2d");
+let M, down = false;
+
+function draw() {
+  const w = M._sim_w(), h = M._sim_h(), st = M._sim_stride(), ptr = M._sim_pixels();
+  const src = M.HEAPU8.subarray(ptr, ptr + st * h);
+  const img = ctx.createImageData(w, h);
+  for (let y = 0; y < h; y++)
+    for (let x = 0; x < w; x++) {
+      const v = src[y * st + x], o = (y * w + x) * 4;
+      img.data[o] = v; img.data[o+1] = v; img.data[o+2] = v; img.data[o+3] = 255;
+    }
+  ctx.putImageData(img, 0, 0);
+}
+function boot() { M._sim_boot(+document.getElementById("lang").value); draw(); }
+function panelXY(e) {
+  const r = canvas.getBoundingClientRect();
+  return [Math.round((e.clientX - r.left) * (540 / r.width)),
+          Math.round((e.clientY - r.top) * (960 / r.height))];
+}
+
+SimT5Module().then((mod) => {
+  M = mod;
+  const sel = document.getElementById("goto");
+  for (const [id, name] of SCREENS) {
+    const o = document.createElement("option");
+    o.value = id; o.textContent = name; sel.appendChild(o);
+  }
+  boot();
+  setInterval(() => { M._sim_tick(250); draw(); }, 250);
+
+  canvas.addEventListener("pointerdown", (e) => {
+    e.preventDefault(); down = true; canvas.setPointerCapture(e.pointerId);
+    const p = panelXY(e); M._sim_touch(p[0], p[1], 1); draw();
+  });
+  canvas.addEventListener("pointermove", (e) => {
+    if (!down) return; const p = panelXY(e); M._sim_touch(p[0], p[1], 1); draw();
+  });
+  const up = (e) => { if (!down) return; down = false; const p = panelXY(e); M._sim_touch(p[0], p[1], 0); M._sim_tick(40); draw(); };
+  canvas.addEventListener("pointerup", up);
+  canvas.addEventListener("pointercancel", up);
+
+  sel.addEventListener("change", () => { M._sim_goto(+sel.value); draw(); });
+  document.getElementById("lang").addEventListener("change", boot);
+  document.getElementById("reset").addEventListener("click", boot);
+});
+</script>
+</body>
+</html>

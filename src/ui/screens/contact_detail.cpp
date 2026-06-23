@@ -58,15 +58,9 @@ static lv_obj_t* create_card(lv_obj_t* parent, lv_coord_t height) {
     lv_obj_set_style_bg_color(card, lv_color_hex(EPD_COLOR_BG), LV_PART_MAIN);
     lv_obj_set_style_border_width(card, UI_BORDER_CARD, LV_PART_MAIN);
     lv_obj_set_style_border_color(card, lv_color_hex(EPD_COLOR_BORDER), LV_PART_MAIN);
-#ifdef BOARD_TDECK
-    lv_obj_set_style_radius(card, 12, LV_PART_MAIN);
-    lv_obj_set_style_pad_all(card, 10, LV_PART_MAIN);
-    lv_obj_set_style_pad_row(card, 6, LV_PART_MAIN);
-#else
     lv_obj_set_style_radius(card, 20, LV_PART_MAIN);
     lv_obj_set_style_pad_all(card, 18, LV_PART_MAIN);
     lv_obj_set_style_pad_row(card, 10, LV_PART_MAIN);
-#endif
     lv_obj_clear_flag(card, LV_OBJ_FLAG_SCROLLABLE);
     return card;
 }
@@ -158,16 +152,6 @@ void set_contact(const char* name, int32_t gps_lat, int32_t gps_lon, uint8_t typ
 
 // Draw compass rose with direction arrow using LVGL line objects
 static void draw_compass(lv_obj_t* parent, double bearing_deg) {
-#ifdef BOARD_TDECK
-    const int compass_size = 120;
-    const int center = 60;
-    const int label_radius = 46;
-    const int arrow_len = 36;
-    const int head_len = 12;
-    const int center_dot = 8;
-    const int shaft_width = 4;
-    const int head_width = 3;
-#else
     const int compass_size = 280;
     const int center = 140;
     const int label_radius = 105;
@@ -176,7 +160,6 @@ static void draw_compass(lv_obj_t* parent, double bearing_deg) {
     const int center_dot = 12;
     const int shaft_width = 6;
     const int head_width = 5;
-#endif
 
     // Compass container
     lv_obj_t* compass = lv_obj_create(parent);
@@ -312,9 +295,6 @@ static void create(ui::kit::Handle parent_kit) {
 
     content_list = ui::nav::scroll_list(parent);
     lv_obj_set_style_pad_row(content_list, UI_MENU_ITEM_PAD, LV_PART_MAIN);
-#ifdef BOARD_TDECK
-    lv_obj_set_style_pad_top(content_list, 4, LV_PART_MAIN);
-#endif
 
     double c_lat = contact_lat / 1e6;
     double c_lon = contact_lon / 1e6;

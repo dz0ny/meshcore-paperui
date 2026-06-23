@@ -87,7 +87,7 @@ uint16_t battery_design_capacity();
 uint16_t battery_remain_capacity();
 uint16_t battery_health();
 
-// Charger (BQ25896 on e-paper, stub on T-Deck)
+// Charger (BQ25896)
 bool     charger_is_valid();
 bool     charger_vbus_in();
 const char* charger_status_str();
@@ -117,7 +117,23 @@ uint8_t keyboard_get_backlight();
 
 // ---------- Board-specific headers ----------
 
-#if defined(BOARD_EPAPER)
+#if defined(MESHUI_SIM)
+
+// Host simulator (tools/sim/t5): no e-paper driver stack. The screens only touch
+// board::touch (isPressed/getPoint) and board::peri_status; provide a tiny touch
+// shim and the version/pin macros they reference, nothing else.
+#define T_PAPER_HW_VERSION    "T5-ePaper-S3-PRO (sim)"
+#define BOARD_BOOT_BTN        (0)
+
+namespace board {
+    struct SimTouch {
+        bool isPressed() { return false; }
+        uint8_t getPoint(int16_t* x, int16_t* y, uint8_t /*n*/) { if (x) *x = 0; if (y) *y = 0; return 0; }
+    };
+    extern SimTouch touch;
+}
+
+#elif defined(BOARD_EPAPER)
 
 #include <driver/i2c.h>
 #include <epdiy.h>
@@ -197,50 +213,6 @@ namespace board {
     }
 }
 
-#elif defined(BOARD_TDECK)
-
-#include "TouchDrvGT911.hpp"
-
-#define T_PAPER_HW_VERSION    "T-Deck"
-
-// Pin definitions (from platformio.ini -D flags)
-#define BOARD_SPI_MISO      TDECK_SPI_MISO
-#define BOARD_SPI_MOSI      TDECK_SPI_MOSI
-#define BOARD_SPI_SCLK      TDECK_SPI_SCLK
-
-#define BOARD_SCL           TDECK_I2C_SCL
-#define BOARD_SDA           TDECK_I2C_SDA
-
-#define BOARD_TOUCH_INT     TDECK_TOUCH_INT
-#define BOARD_TOUCH_RST     (-1)
-
-#define BOARD_SD_CS         TDECK_SD_CS
-#define BOARD_LORA_CS       P_LORA_NSS
-
-#define BOARD_BOOT_BTN      TDECK_TB_CLICK
-
-#define SerialMon           Serial
-
-namespace board {
-    extern TouchDrvGT911 touch;
-
-    namespace detail {
-        bool display_init();
-        bool touch_init();
-        bool keyboard_init();
-        bool trackball_init();
-        bool sd_init();
-        bool gps_init();
-    }
-    // Trackball
-    struct TrackballState {
-        int8_t dx;  // accumulated horizontal movement
-        int8_t dy;  // accumulated vertical movement
-        bool clicked;
-    };
-    TrackballState trackball_read();
-}
-
 #else
-#error "Define BOARD_EPAPER or BOARD_TDECK"
+#error "Define BOARD_EPAPER"
 #endif

@@ -10,7 +10,7 @@
 // This header is that handful — in OUR vocabulary, not LVGL's generic object
 // model — so it can be backed by two implementations:
 //
-//   ui_kit_lvgl.cpp  — thin shim over lv_* (ESP32 boards: T5 ePaper, T-Deck)
+//   ui_kit_lvgl.cpp  — thin shim over lv_* (ESP32 boards: T5 ePaper)
 //   ui_kit_mono.cpp  — tiny 1-bit engine drawing straight to GxEPD2 (nRF52)
 //
 // Screens are written ONCE against ui::kit. Per-panel layout differences stay

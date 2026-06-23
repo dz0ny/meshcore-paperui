@@ -28,119 +28,6 @@ static void style_hit_area(lv_obj_t* obj) {
     }
 }
 
-#ifdef BOARD_TDECK
-static void set_back_pressed_visual(lv_obj_t* obj, bool pressed) {
-    if (!obj) return;
-    lv_color_t color = lv_color_hex(pressed ? EPD_COLOR_BORDER : EPD_COLOR_TEXT);
-    uint32_t child_count = lv_obj_get_child_count(obj);
-    for (uint32_t i = 0; i < child_count; i++) {
-        lv_obj_t* child = lv_obj_get_child(obj, i);
-        lv_obj_set_style_text_color(child, color, LV_PART_MAIN);
-    }
-}
-
-static void on_back_press_feedback(lv_event_t* e) {
-    lv_event_code_t code = lv_event_get_code(e);
-    lv_obj_t* target = (lv_obj_t*)lv_event_get_user_data(e);
-    if (!target) return;
-    if (code == LV_EVENT_PRESSED) {
-        set_back_pressed_visual(target, true);
-    } else if (code == LV_EVENT_RELEASED || code == LV_EVENT_PRESS_LOST) {
-        set_back_pressed_visual(target, false);
-    }
-}
-
-static void set_back_focus_visual(lv_obj_t* obj, bool focused) {
-    if (!obj) return;
-    lv_color_t color = lv_color_hex(focused ? EPD_COLOR_FOCUS : EPD_COLOR_TEXT);
-    uint32_t child_count = lv_obj_get_child_count(obj);
-    for (uint32_t i = 0; i < child_count; i++) {
-        lv_obj_t* child = lv_obj_get_child(obj, i);
-        lv_obj_set_style_text_color(child, color, LV_PART_MAIN);
-    }
-}
-
-static void on_back_focus_feedback(lv_event_t* e) {
-    lv_event_code_t code = lv_event_get_code(e);
-    lv_obj_t* target = (lv_obj_t*)lv_event_get_user_data(e);
-    if (!target) return;
-    if (code == LV_EVENT_FOCUSED) {
-        set_back_focus_visual(target, true);
-    } else if (code == LV_EVENT_DEFOCUSED) {
-        set_back_focus_visual(target, false);
-    }
-}
-
-static void set_menu_pressed_visual(lv_obj_t* obj, bool pressed) {
-    if (!obj) return;
-    lv_color_t color = lv_color_hex(pressed ? EPD_COLOR_BORDER : EPD_COLOR_TEXT);
-    uint32_t child_count = lv_obj_get_child_count(obj);
-    for (uint32_t i = 0; i < child_count; i++) {
-        lv_obj_t* child = lv_obj_get_child(obj, i);
-        lv_obj_set_style_text_color(child, color, LV_PART_MAIN);
-    }
-}
-
-static void on_menu_press_feedback(lv_event_t* e) {
-    lv_event_code_t code = lv_event_get_code(e);
-    lv_obj_t* target = (lv_obj_t*)lv_event_get_user_data(e);
-    if (!target) return;
-    if (code == LV_EVENT_PRESSED) {
-        set_menu_pressed_visual(target, true);
-    } else if (code == LV_EVENT_RELEASED || code == LV_EVENT_PRESS_LOST) {
-        set_menu_pressed_visual(target, false);
-    }
-}
-
-static void set_row_focus_visual(lv_obj_t* obj, bool focused) {
-    if (!obj) return;
-    lv_color_t bg = lv_color_hex(focused ? EPD_COLOR_FOCUS : EPD_COLOR_BG);
-    lv_color_t text = lv_color_hex(focused ? EPD_COLOR_BG : EPD_COLOR_TEXT);
-    lv_obj_set_style_bg_color(obj, bg, LV_PART_MAIN);
-
-    uint32_t child_count = lv_obj_get_child_count(obj);
-    for (uint32_t i = 0; i < child_count; i++) {
-        lv_obj_t* child = lv_obj_get_child(obj, i);
-        lv_obj_set_style_text_color(child, text, LV_PART_MAIN);
-    }
-}
-
-static void on_row_focus_feedback(lv_event_t* e) {
-    lv_event_code_t code = lv_event_get_code(e);
-    lv_obj_t* target = (lv_obj_t*)lv_event_get_user_data(e);
-    if (!target) return;
-    if (code == LV_EVENT_FOCUSED) {
-        set_row_focus_visual(target, true);
-    } else if (code == LV_EVENT_DEFOCUSED) {
-        set_row_focus_visual(target, false);
-    }
-}
-
-static void set_action_focus_visual(lv_obj_t* obj, bool focused) {
-    if (!obj) return;
-    lv_color_t bg = lv_color_hex(focused ? EPD_COLOR_FOCUS : EPD_COLOR_BG);
-    lv_color_t text = lv_color_hex(focused ? EPD_COLOR_BG : EPD_COLOR_TEXT);
-    lv_obj_set_style_bg_color(obj, bg, LV_PART_MAIN);
-
-    uint32_t child_count = lv_obj_get_child_count(obj);
-    for (uint32_t i = 0; i < child_count; i++) {
-        lv_obj_t* child = lv_obj_get_child(obj, i);
-        lv_obj_set_style_text_color(child, text, LV_PART_MAIN);
-    }
-}
-
-static void on_action_focus_feedback(lv_event_t* e) {
-    lv_event_code_t code = lv_event_get_code(e);
-    lv_obj_t* target = (lv_obj_t*)lv_event_get_user_data(e);
-    if (!target) return;
-    if (code == LV_EVENT_FOCUSED) {
-        set_action_focus_visual(target, true);
-    } else if (code == LV_EVENT_DEFOCUSED) {
-        set_action_focus_visual(target, false);
-    }
-}
-#endif
-
 static lv_obj_t* create_hit_row(lv_obj_t* parent, lv_event_cb_t cb, void* user_data) {
     lv_obj_t* hit = lv_obj_create(parent);
     lv_obj_set_size(hit, lv_pct(100), UI_MENU_ITEM_HEIGHT);
@@ -194,10 +81,6 @@ static lv_obj_t* create_nav_action_button(lv_obj_t* parent, const char* action_t
     lv_obj_add_event_cb(action, action_cb, LV_EVENT_CLICKED, action_user_data);
     lv_obj_set_ext_click_area(action, UI_EXT_CLICK_ACTION);
     ui::port::keyboard_focus_register(action);
-#ifdef BOARD_TDECK
-    lv_obj_add_event_cb(action, on_action_focus_feedback, LV_EVENT_FOCUSED, action);
-    lv_obj_add_event_cb(action, on_action_focus_feedback, LV_EVENT_DEFOCUSED, action);
-#endif
 
     lv_obj_t* label = lv_label_create(action);
     lv_obj_set_style_text_font(label, UI_FONT_TITLE, LV_PART_MAIN);
@@ -231,13 +114,6 @@ lv_obj_t* back_button(lv_obj_t* parent, const char* title, lv_event_cb_t cb) {
     lv_obj_add_flag(row, LV_OBJ_FLAG_EVENT_BUBBLE);
     lv_obj_set_flex_flow(row, LV_FLEX_FLOW_ROW);
     lv_obj_set_flex_align(row, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-#ifdef BOARD_TDECK
-    lv_obj_add_event_cb(hit, on_back_press_feedback, LV_EVENT_PRESSED, row);
-    lv_obj_add_event_cb(hit, on_back_press_feedback, LV_EVENT_RELEASED, row);
-    lv_obj_add_event_cb(hit, on_back_press_feedback, LV_EVENT_PRESS_LOST, row);
-    lv_obj_add_event_cb(hit, on_back_focus_feedback, LV_EVENT_FOCUSED, row);
-    lv_obj_add_event_cb(hit, on_back_focus_feedback, LV_EVENT_DEFOCUSED, row);
-#endif
 
     create_back_content(row, ui::screen_mgr::previous_nav_title(title));
 
@@ -296,13 +172,6 @@ lv_obj_t* back_button_three_actions_ex(lv_obj_t* parent, const char* title, lv_e
     ui::port::keyboard_focus_register(back);
     lv_obj_set_flex_flow(back, LV_FLEX_FLOW_ROW);
     lv_obj_set_flex_align(back, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-#ifdef BOARD_TDECK
-    lv_obj_add_event_cb(back, on_back_press_feedback, LV_EVENT_PRESSED, back);
-    lv_obj_add_event_cb(back, on_back_press_feedback, LV_EVENT_RELEASED, back);
-    lv_obj_add_event_cb(back, on_back_press_feedback, LV_EVENT_PRESS_LOST, back);
-    lv_obj_add_event_cb(back, on_back_focus_feedback, LV_EVENT_FOCUSED, back);
-    lv_obj_add_event_cb(back, on_back_focus_feedback, LV_EVENT_DEFOCUSED, back);
-#endif
 
     create_back_content(back, ui::screen_mgr::previous_nav_title(title));
 
@@ -356,13 +225,6 @@ lv_obj_t* menu_item(lv_obj_t* parent, const void* icon_src, const char* label_te
     lv_obj_add_style(cont, &ui::theme::style_menu_row, LV_PART_MAIN);
     lv_obj_clear_flag(cont, (lv_obj_flag_t)(LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_CLICKABLE));
     lv_obj_add_flag(cont, LV_OBJ_FLAG_EVENT_BUBBLE);
-#ifdef BOARD_TDECK
-    lv_obj_add_event_cb(hit, on_menu_press_feedback, LV_EVENT_PRESSED, cont);
-    lv_obj_add_event_cb(hit, on_menu_press_feedback, LV_EVENT_RELEASED, cont);
-    lv_obj_add_event_cb(hit, on_menu_press_feedback, LV_EVENT_PRESS_LOST, cont);
-    lv_obj_add_event_cb(hit, on_row_focus_feedback, LV_EVENT_FOCUSED, cont);
-    lv_obj_add_event_cb(hit, on_row_focus_feedback, LV_EVENT_DEFOCUSED, cont);
-#endif
 
     (void)icon_src;  // unused — all callers pass NULL
 
@@ -390,13 +252,6 @@ lv_obj_t* toggle_item(lv_obj_t* parent, const char* label_text, const char* valu
     lv_obj_add_style(cont, &ui::theme::style_menu_row, LV_PART_MAIN);
     lv_obj_clear_flag(cont, (lv_obj_flag_t)(LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_CLICKABLE));
     lv_obj_add_flag(cont, LV_OBJ_FLAG_EVENT_BUBBLE);
-#ifdef BOARD_TDECK
-    lv_obj_add_event_cb(hit, on_menu_press_feedback, LV_EVENT_PRESSED, cont);
-    lv_obj_add_event_cb(hit, on_menu_press_feedback, LV_EVENT_RELEASED, cont);
-    lv_obj_add_event_cb(hit, on_menu_press_feedback, LV_EVENT_PRESS_LOST, cont);
-    lv_obj_add_event_cb(hit, on_row_focus_feedback, LV_EVENT_FOCUSED, cont);
-    lv_obj_add_event_cb(hit, on_row_focus_feedback, LV_EVENT_DEFOCUSED, cont);
-#endif
 
     lv_obj_t* lbl = lv_label_create(cont);
     lv_obj_set_style_text_font(lbl, UI_FONT_TITLE, LV_PART_MAIN);
@@ -422,10 +277,6 @@ lv_obj_t* text_button(lv_obj_t* parent, const char* text, lv_event_cb_t cb, void
     lv_obj_add_event_cb(btn, cb, LV_EVENT_CLICKED, user_data);
     lv_obj_set_ext_click_area(btn, UI_EXT_CLICK_ACTION);
     ui::port::keyboard_focus_register(btn);
-#ifdef BOARD_TDECK
-    lv_obj_add_event_cb(btn, on_row_focus_feedback, LV_EVENT_FOCUSED, btn);
-    lv_obj_add_event_cb(btn, on_row_focus_feedback, LV_EVENT_DEFOCUSED, btn);
-#endif
 
     lv_obj_t* lbl = lv_label_create(btn);
     lv_obj_set_style_text_font(lbl, UI_FONT_TITLE, LV_PART_MAIN);

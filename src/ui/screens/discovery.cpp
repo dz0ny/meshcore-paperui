@@ -62,14 +62,14 @@ static void on_filter_cycle(lv_event_t* e) {
 static void ensure_row(int idx) {
     if (!node_list || idx < 0 || idx >= 16 || node_rows[idx]) return;
 
-    lv_obj_t* value = ui::nav::toggle_item(node_list, "", "", on_node_click, (void*)(intptr_t)idx);
-    lv_obj_t* hit = lv_obj_get_parent(value);
-    lv_obj_t* row = hit ? lv_obj_get_child(hit, 0) : NULL;
-    lv_obj_t* label = row ? lv_obj_get_child(row, 0) : NULL;
+    lv_obj_t* val = ui::nav::toggle_item(node_list, "", "", on_node_click, (void*)(intptr_t)idx);
+    lv_obj_t* cont = lv_obj_get_parent(val);            // container holding [name, value]
+    lv_obj_t* name = cont ? lv_obj_get_child(cont, 0) : NULL;  // name label (child 0)
+    lv_obj_t* hit = cont ? lv_obj_get_parent(cont) : NULL;     // hit row (toggle_item return's grandparent)
 
     node_rows[idx] = hit;
-    node_row_labels[idx] = label;
-    node_row_values[idx] = value;
+    node_row_labels[idx] = name;
+    node_row_values[idx] = val;
     row_node_idx[idx] = -1;
     row_visible[idx] = false;
     lv_obj_add_flag(hit, LV_OBJ_FLAG_HIDDEN);

@@ -76,20 +76,20 @@ screen_lifecycle_t lifecycle = { create, entry, exit_fn, destroy };
 
 ### Layout Constants
 
-All layout values live in `src/ui/layout/epaper.h` and `src/ui/layout/tdeck.h` as `UI_*` defines. Always use these defines — never hardcode pixel values.
+All layout values live in `src/ui/layout/epaper.h` as `UI_*` defines. Always use these defines — never hardcode pixel values.
 
-| Element | Define prefix | e-paper | T-Deck |
-|---------|--------------|---------|--------|
-| Splash title | `UI_SPLASH_TITLE_Y` | -60 | -40 |
-| Splash subtitle | `UI_SPLASH_SUB_Y` | 60 | 20 |
-| Splash version | `UI_SPLASH_VER_Y` | 100 | 50 |
-| Splash status | `UI_SPLASH_STATUS_Y` | 160 | 80 |
-| Statusbar | `UI_STATUSBAR_*` | y=5, h=50 | y=0, h=18 |
-| Back button | `UI_BACK_BTN_*` | y=50, h=70 | y=10, h=24 |
-| scroll_list | `UI_SCROLL_LIST_*` | 85% h, y=-10 | 82% h, y=-1 |
-| menu_item | `UI_MENU_ITEM_*` | 85px h, 15px pad | 40px h, 4px pad |
-| text_button | `UI_TEXT_BTN_*` | 80px h, 12px radius | 44px h, 6px radius |
-| ext_click_area | `UI_EXT_CLICK_*` | 35/25/25 | 20/15/15 |
+| Element | Define prefix | e-paper |
+|---------|--------------|---------|
+| Splash title | `UI_SPLASH_TITLE_Y` | -60 |
+| Splash subtitle | `UI_SPLASH_SUB_Y` | 60 |
+| Splash version | `UI_SPLASH_VER_Y` | 100 |
+| Splash status | `UI_SPLASH_STATUS_Y` | 160 |
+| Statusbar | `UI_STATUSBAR_*` | y=5, h=50 |
+| Back button | `UI_BACK_BTN_*` | y=50, h=70 |
+| scroll_list | `UI_SCROLL_LIST_*` | 85% h, y=-10 |
+| menu_item | `UI_MENU_ITEM_*` | 85px h, 15px pad |
+| text_button | `UI_TEXT_BTN_*` | 80px h, 12px radius |
+| ext_click_area | `UI_EXT_CLICK_*` | 35/25/25 |
 
 ### UI Components (ui::nav namespace in nav_button.h)
 
