@@ -3,7 +3,7 @@
 # requires-python = ">=3.9"
 # dependencies = ["esptool"]
 # ///
-"""Generate the unified MeshCore MeshUI web flasher page.
+"""Generate the unified MeshCore PaperUI web flasher page.
 
 Run with `uv run tools/build_web_flasher.py ...`. The HTML lives in
 tools/web_flasher_assets/*.html as string.Template files ($placeholders) —
@@ -34,6 +34,35 @@ CHIP = "esp32s3"
 CHIP_FAMILY = "ESP32-S3"
 
 TARGETS = [
+    {
+        "env": "wio-tracker-l1",
+        "slug": "wio-tracker-l1",
+        "device_name": "Seeed Wio Tracker L1",
+        "tab_label": "Wio Tracker L1",
+        "flash_method": "web-serial-dfu",
+        "chip_label": "nRF52840",
+        "description": "The Wio Tracker L1 is an nRF52840 mono e-ink tracker. Double-tap RESET to enter the bootloader, then flash it straight from Chrome or Edge over Web Serial — no toolchain or drag-and-drop required. A UF2 download is provided as a fallback.",
+        "product_url": None,
+        "product_image": None,
+        # Rendered by the native UI simulator (see tools/gen_wio_shots.sh). 1-bit
+        # e-ink renders, so the gallery shows them pixel-crisp (no smoothing).
+        "pixelated": True,
+        # Native 250x122 mono panel — show at ~2x, pixel-doubled, not column-wide.
+        "screen_max_w": "31rem",
+        # Embed the interactive WASM build of the mono UI (tools/sim/build_web.sh)
+        # as a live "Live preview" section in this panel.
+        "preview": True,
+        "screenshots": [
+            ("wio-chat.png", "Messages", "Read and reply to mesh messages on the mono e-ink display."),
+            ("wio-team.png", "Team", "Roster of nearby team members with their last-heard status."),
+            ("wio-trail.png", "Trail", "Record your GPS breadcrumb track with live distance, time, and speed."),
+            ("wio-waypoints.png", "Waypoints", "Saved locations and shared points of interest."),
+            ("wio-gps.png", "GPS status", "Fix quality, satellite count, coordinates, and altitude."),
+            ("wio-compass.png", "Compass", "Live heading with bearing and distance to a selected waypoint."),
+            ("wio-settings.png", "Settings", "Radio, display, and device options."),
+            ("wio-keyboard.png", "On-screen keyboard", "Compose text on-device with the button-driven keyboard."),
+        ],
+    },
     {
         "env": "t5-epaper",
         "slug": "lilygo-t5-epaper-pro",
@@ -66,38 +95,9 @@ TARGETS = [
         "product_image": None,
         "screenshots": [],
     },
-    {
-        "env": "wio-tracker-l1",
-        "slug": "wio-tracker-l1",
-        "device_name": "Seeed Wio Tracker L1",
-        "tab_label": "Wio Tracker L1",
-        "flash_method": "web-serial-dfu",
-        "chip_label": "nRF52840",
-        "description": "The Wio Tracker L1 is an nRF52840 mono e-ink tracker. Double-tap RESET to enter the bootloader, then flash it straight from Chrome or Edge over Web Serial — no toolchain or drag-and-drop required. A UF2 download is provided as a fallback.",
-        "product_url": None,
-        "product_image": None,
-        # Rendered by the native UI simulator (see tools/gen_wio_shots.sh). 1-bit
-        # e-ink renders, so the gallery shows them pixel-crisp (no smoothing).
-        "pixelated": True,
-        # Native 250x122 mono panel — show at ~2x, pixel-doubled, not column-wide.
-        "screen_max_w": "31rem",
-        # Embed the interactive WASM build of the mono UI (tools/sim/build_web.sh)
-        # as a live "Live preview" section in this panel.
-        "preview": True,
-        "screenshots": [
-            ("wio-chat.png", "Messages", "Read and reply to mesh messages on the mono e-ink display."),
-            ("wio-team.png", "Team", "Roster of nearby team members with their last-heard status."),
-            ("wio-trail.png", "Trail", "Record your GPS breadcrumb track with live distance, time, and speed."),
-            ("wio-waypoints.png", "Waypoints", "Saved locations and shared points of interest."),
-            ("wio-gps.png", "GPS status", "Fix quality, satellite count, coordinates, and altitude."),
-            ("wio-compass.png", "Compass", "Live heading with bearing and distance to a selected waypoint."),
-            ("wio-settings.png", "Settings", "Radio, display, and device options."),
-            ("wio-keyboard.png", "On-screen keyboard", "Compose text on-device with the button-driven keyboard."),
-        ],
-    },
 ]
 
-PROJECT_NAME = "MeshCore MeshUI Flasher"
+PROJECT_NAME = "MeshCore PaperUI Flasher"
 
 
 def parse_args() -> argparse.Namespace:
