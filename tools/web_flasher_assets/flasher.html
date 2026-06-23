@@ -35,7 +35,6 @@
       };
     </script>
     <script type="module" src="https://unpkg.com/esp-web-tools@10/dist/web/install-button.js?module"></script>
-    <script type="module" src="nrf52-dfu.js"></script>
     <style>
       /* shadcn/ui "neutral" base color — light theme tokens */
       :root {
@@ -85,76 +84,25 @@
       progress.ui-progress::-webkit-progress-bar { background: hsl(var(--secondary)); border-radius: 9999px; }
       progress.ui-progress::-webkit-progress-value { background: hsl(var(--primary)); border-radius: 9999px; }
       progress.ui-progress::-moz-progress-bar { background: hsl(var(--primary)); border-radius: 9999px; }
+
+      /* WASM live-preview controls (shared by the Wio mono + T5 LVGL previews) */
+      .sim canvas { background:#fff; border:1px solid hsl(var(--border)); border-radius:6px; touch-action:none; }
+      .sim.sim-t5 canvas { width:240px; height:auto; cursor:pointer; }
+      .sim.sim-wio canvas { image-rendering: pixelated; border-radius:4px; }
+      .sim .dpad { display:grid; grid-template-columns:repeat(3,40px); grid-template-rows:repeat(3,40px); gap:4px; }
+      .sim .dpad button { padding:0; font-size:15px; }
+      .sim .dpad .u{grid-area:1/2} .sim .dpad .l{grid-area:2/1} .sim .dpad .e{grid-area:2/2}
+      .sim .dpad .r{grid-area:2/3} .sim .dpad .d{grid-area:3/2} .sim .dpad .b{grid-area:1/3}
+      .sim .ctl { display:inline-flex; align-items:center; justify-content:center; white-space:nowrap;
+        border:1px solid hsl(var(--border)); border-radius:6px; padding:5px 10px; font-size:12px; font-weight:500;
+        background:hsl(var(--background)); color:hsl(var(--foreground)); cursor:pointer; }
+      .sim .ctl:hover { background:hsl(var(--muted)); }
+      .sim select.ctl { cursor:pointer; }
     </style>
   </head>
   <body class="min-h-screen bg-background text-foreground antialiased">
-    <main class="mx-auto w-[min(48rem,calc(100vw-2rem))] space-y-8 py-12 max-sm:py-8">
-      <header class="space-y-2">
-        <h1 class="text-3xl font-bold tracking-tight sm:text-4xl">$project_name</h1>
-        <p class="text-muted-foreground">Pick your device, then flash it from the browser. <a class="font-medium text-primary underline-offset-4 hover:underline" href="$repo_url">Repository</a></p>
-      </header>
-      <div class="space-y-4">
-$tablist
-$panels
-      </div>
-      <div class="rounded-md border bg-muted/40 p-4 text-sm leading-6 text-muted-foreground">
-        <p>Use a USB data cable and Chrome or Edge on desktop. ESP32 boards (T5 ePaper, T-Deck) flash in-browser over Web Serial with ESP Web Tools; the nRF52 Wio Tracker L1 flashes over Web Serial too — double-tap RESET into the bootloader first, or fall back to copying its UF2 onto the bootloader drive.</p>
-        <ol class="mt-2 list-decimal space-y-1 pl-5">
-          <li>Put the board in bootloader mode if the browser cannot detect it.</li>
-          <li>Choose erase when you want a clean install (ESP32 Web Serial only).</li>
-        </ol>
-      </div>
-    </main>
-    <script>
-      (function () {
-        var tabs = document.querySelectorAll("[data-tab]");
-        var panels = document.querySelectorAll("[data-panel]");
-        function activate(slug) {
-          tabs.forEach(function (t) {
-            t.setAttribute("data-state", t.dataset.tab === slug ? "active" : "inactive");
-          });
-          panels.forEach(function (p) { p.hidden = p.dataset.panel !== slug; });
-        }
-        tabs.forEach(function (t) {
-          t.addEventListener("click", function () { activate(t.dataset.tab); });
-        });
-      })();
-
-      // Screen galleries: auto-advance every 3s, but let the user switch
-      // manually with the chips below the stage (which stops auto-advance).
-      (function () {
-        document.querySelectorAll("[data-gallery]").forEach(function (box) {
-          var slides = box.querySelectorAll(".slide");
-          var chips = box.querySelectorAll("[data-go]");
-          var nameEl = box.querySelector("[data-caption-name]");
-          var descEl = box.querySelector("[data-caption-desc]");
-          var captions = [];
-          try { captions = JSON.parse(box.getAttribute("data-captions") || "[]"); } catch (e) {}
-          if (!slides.length) return;
-          var i = 0;
-          var timer = null;
-          function show(n) {
-            slides[i].classList.remove("is-active");
-            chips[i] && chips[i].setAttribute("data-state", "inactive");
-            i = (n + slides.length) % slides.length;
-            slides[i].classList.add("is-active");
-            chips[i] && chips[i].setAttribute("data-state", "active");
-            if (captions[i]) {
-              if (nameEl) nameEl.textContent = captions[i].name;
-              if (descEl) descEl.textContent = captions[i].desc;
-            }
-          }
-          chips.forEach(function (chip) {
-            chip.addEventListener("click", function () {
-              if (timer) { clearInterval(timer); timer = null; }
-              show(parseInt(chip.getAttribute("data-go"), 10) || 0);
-            });
-          });
-          if (slides.length > 1) {
-            timer = setInterval(function () { show(i + 1); }, 3000);
-          }
-        });
-      })();
-    </script>
+    <div id="app"></div>
+    <script>window.__FLASHER_PREACT__ = true; window.__FLASHER__ = $config;</script>
+    <script type="module" src="app.mjs"></script>
   </body>
 </html>

@@ -323,4 +323,10 @@ function wire(root) {
   });
 }
 
-for (const el of document.querySelectorAll("[data-nrf-dfu]")) wire(el);
+// The Preact app calls wire() on each rendered [data-nrf-dfu] element. When this
+// module is loaded standalone (no app), fall back to self-wiring the DOM.
+export { wire, flash };
+
+if (!window.__FLASHER_PREACT__) {
+  for (const el of document.querySelectorAll("[data-nrf-dfu]")) wire(el);
+}

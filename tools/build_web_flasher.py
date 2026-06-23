@@ -134,149 +134,68 @@ def load_template(name: str) -> Template:
     return Template((TEMPLATE_DIR / name).read_text(encoding="utf-8"))
 
 
-# Tab trigger + gallery rows are the only repeated fragments built in Python.
-TAB_TRIGGER = Template(
-    '        <button role="tab" id="tab-$slug" data-tab="$slug" data-state="$state" '
-    'aria-controls="$slug" class="inline-flex flex-1 items-center justify-center '
-    "whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium ring-offset-background "
-    "transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring "
-    "data-[state=active]:bg-background data-[state=active]:text-foreground "
-    'data-[state=active]:shadow-sm">$label</button>'
-)
-SLIDE_IMG = Template(
-    '                  <img src="$src" alt="$alt"'
-    ' class="slide rounded-md border object-contain$pix$active" />'
-)
-SCREEN_CHIP = Template(
-    '                <button type="button" data-go="$i" data-state="$state"'
-    ' class="rounded-full border px-3 py-1 text-xs font-medium transition-colors'
-    " data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
-    " data-[state=inactive]:bg-background data-[state=inactive]:text-muted-foreground"
-    ' data-[state=inactive]:hover:text-foreground">$name</button>'
-)
-PRODUCT_LINK = Template(
-    '<a class="text-sm font-medium text-primary underline-offset-4 hover:underline" '
-    'href="$url">Product page</a>'
-)
+EYEBROWS = {
+    "web-serial-dfu": "Web Serial Flasher",
+    "uf2": "UF2 Drag & Drop",
+    "esp-web-tools": "Browser Flasher",
+}
 
 
-def build_target_panel(target: dict, version: str, active: bool) -> str:
-    device_name = html.escape(target["device_name"])
-    product_url = html.escape(target.get("product_url") or "", quote=True)
-    method = target.get("flash_method", "esp-web-tools")
+def build_target_config(target: dict, version: str) -> dict:
+    """Serialize one target into the JSON the Preact app (app.mjs) renders.
+
+    The app builds all DOM from this config, so every per-device value the page
+    needs — labels, asset paths, flash-action attributes — is emitted here.
+    """
     slug = target["slug"]
-
-    product_link = PRODUCT_LINK.substitute(url=product_url) if product_url else ""
-
-    product_image_html = ""
-    if target.get("product_image"):
-        product_image_html = load_template("fragment_product_image.html").substitute(
-            src=f"{slug}/{html.escape(target['product_image'])}",
-            device_name=device_name,
-        )
-
-    screenshots_html = ""
-    if target.get("screenshots"):
-        shots = target["screenshots"]
-        pix = " pixelated" if target.get("pixelated") else ""
-        imgs = "\n".join(
-            SLIDE_IMG.substitute(
-                src=f"{slug}/{html.escape(name)}",
-                alt=html.escape(scr_name),
-                pix=pix,
-                active=" is-active" if i == 0 else "",
-            )
-            for i, (name, scr_name, _desc) in enumerate(shots)
-        )
-        chips = "\n".join(
-            SCREEN_CHIP.substitute(
-                i=i,
-                state="active" if i == 0 else "inactive",
-                name=html.escape(scr_name),
-            )
-            for i, (_name, scr_name, _desc) in enumerate(shots)
-        )
-        captions = html.escape(
-            json.dumps([{"name": n, "desc": d} for (_f, n, d) in shots]),
-            quote=True,
-        )
-        screenshots_html = load_template("fragment_screens.html").substitute(
-            captions=captions,
-            max_w=target.get("screen_max_w", "20rem"),
-            imgs=imgs,
-            chips=chips,
-            first_name=html.escape(shots[0][1]),
-            first_desc=html.escape(shots[0][2]),
-        )
+    method = target.get("flash_method", "esp-web-tools")
 
     if method == "web-serial-dfu":
-        eyebrow = "Web Serial Flasher"
-        action_html = load_template("fragment_action_dfu.html").substitute(
-            bin_attr=html.escape(f"{slug}/{slug}-{version}.bin", quote=True),
-            dat_attr=html.escape(f"{slug}/{slug}-{version}.dat", quote=True),
-            uf2_href=html.escape(f"{slug}/{slug}-{version}.uf2", quote=True),
-            product_link=product_link,
-        )
+        action = {
+            "bin": f"{slug}/{slug}-{version}.bin",
+            "dat": f"{slug}/{slug}-{version}.dat",
+            "uf2": f"{slug}/{slug}-{version}.uf2",
+        }
     elif method == "uf2":
-        eyebrow = "UF2 Drag &amp; Drop"
-        action_html = load_template("fragment_action_uf2.html").substitute(
-            uf2_href=html.escape(f"{slug}/{slug}-{version}.uf2", quote=True),
-            product_link=product_link,
-        )
+        action = {"uf2": f"{slug}/{slug}-{version}.uf2"}
     else:
-        eyebrow = "Browser Flasher"
-        action_html = load_template("fragment_action_esp.html").substitute(
-            manifest=html.escape(f"{slug}/manifest.json", quote=True),
-            product_link=product_link,
-        )
+        action = {"manifest": f"{slug}/manifest.json"}
 
-    # Interactive WASM preview — fragment per device family ("wio" mono, "t5" LVGL).
-    preview = target.get("preview")
-    preview_html = ""
-    if preview:
-        preview_html = load_template(f"fragment_preview_{preview}.html").template
-
-    return load_template("flasher_panel.html").substitute(
-        slug=slug,
-        hidden="" if active else " hidden",
-        eyebrow=eyebrow,
-        device_name=device_name,
-        description=html.escape(target["description"]),
-        chip_label=html.escape(target.get("chip_label", CHIP_FAMILY)),
-        version=html.escape(version),
-        action_html=action_html,
-        product_image_html=product_image_html,
-        screenshots_html=screenshots_html,
-        preview_html=preview_html,
-    )
-
-
-def build_tablist(targets: list[dict]) -> str:
-    triggers = "\n".join(
-        TAB_TRIGGER.substitute(
-            slug=t["slug"],
-            state="active" if i == 0 else "inactive",
-            label=html.escape(t.get("tab_label", t["device_name"])),
-        )
-        for i, t in enumerate(targets)
-    )
-    return (
-        '      <div role="tablist" class="inline-flex h-auto w-full flex-wrap items-center '
-        'justify-center gap-1 rounded-md bg-muted p-1 text-muted-foreground">\n'
-        f"{triggers}\n"
-        "      </div>"
-    )
+    return {
+        "slug": slug,
+        "tabLabel": target.get("tab_label", target["device_name"]),
+        "deviceName": target["device_name"],
+        "description": target["description"],
+        "chipLabel": target.get("chip_label", CHIP_FAMILY),
+        "eyebrow": EYEBROWS.get(method, EYEBROWS["esp-web-tools"]),
+        "method": method,
+        "productUrl": target.get("product_url"),
+        "productImage": (
+            f"{slug}/{target['product_image']}" if target.get("product_image") else None
+        ),
+        "screenMaxW": target.get("screen_max_w", "20rem"),
+        "pixelated": bool(target.get("pixelated")),
+        "preview": target.get("preview"),
+        "action": action,
+        "screenshots": [
+            {"src": f"{slug}/{name}", "name": scr_name, "desc": desc}
+            for (name, scr_name, desc) in target.get("screenshots", [])
+        ],
+    }
 
 
 def build_page(version: str, repo_url: str) -> str:
+    config = {
+        "projectName": PROJECT_NAME,
+        "repoUrl": repo_url,
+        "version": version,
+        "targets": [build_target_config(t, version) for t in TARGETS],
+    }
+    # Embed as JSON in a <script>; </ is escaped so the literal can't close the tag.
+    config_json = json.dumps(config, ensure_ascii=False).replace("</", "<\\/")
     return load_template("flasher.html").substitute(
         project_name=html.escape(PROJECT_NAME),
-        repo_url=html.escape(repo_url, quote=True),
-        tablist=build_tablist(TARGETS),
-        panels="\n".join(
-            build_target_panel(t, version, active=(i == 0))
-            for i, t in enumerate(TARGETS)
-        ),
+        config=config_json,
     )
 
 
@@ -307,7 +226,7 @@ def main() -> None:
         elif method == "web-serial-dfu":
             # nRF52840: flash in-browser over Web Serial (legacy Nordic SLIP DFU,
             # the protocol adafruit-nrfutil speaks). The browser flasher
-            # (nrf52-dfu.js) needs the application image + init packet, which the
+            # (nrf52-dfu.mjs) needs the application image + init packet, which the
             # PlatformIO-produced firmware.zip (the adafruit-nrfutil DFU package)
             # already contains. Extract them next to the page. Ship the UF2 too as
             # a drag-and-drop fallback.
@@ -402,10 +321,16 @@ def main() -> None:
 
     # Ship the Web Serial nRF52 DFU flasher module alongside the page.
     if any(t.get("flash_method") == "web-serial-dfu" for t in TARGETS):
-        dfu_js = Path(__file__).resolve().parent / "web_flasher_assets" / "nrf52-dfu.js"
+        dfu_js = Path(__file__).resolve().parent / "web_flasher_assets" / "nrf52-dfu.mjs"
         if not dfu_js.is_file():
             raise FileNotFoundError(dfu_js)
-        shutil.copy2(dfu_js, output_dir / "nrf52-dfu.js")
+        shutil.copy2(dfu_js, output_dir / "nrf52-dfu.mjs")
+
+    # Ship the Preact front-end module alongside the page.
+    app_js = TEMPLATE_DIR / "app.mjs"
+    if not app_js.is_file():
+        raise FileNotFoundError(app_js)
+    shutil.copy2(app_js, output_dir / "app.mjs")
 
     # Write the unified index page
     (output_dir / "index.html").write_text(build_page(args.version, args.repo_url), encoding="utf-8")
