@@ -35,7 +35,7 @@ void set_statusbar(int h, StatusbarFn fn);
 
 // Fixed bottom action bar — always visible, never scrolls (mirrors the status
 // bar at the top). The engine sizes it to the Title font, paints it as a solid
-// bar with `label` centered, and routes Left/Right button presses to fn(user).
+// bar with `label` centered, and routes the Enter button to fn(user).
 // Pass label=nullptr to clear; reset() (a new screen) clears it automatically.
 void set_footer(const char* label, ui::kit::Cb fn, void* user);
 void tick(uint32_t now_ms);   // fire any due timers

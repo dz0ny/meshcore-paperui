@@ -923,9 +923,9 @@ static int content_bottom(Node* n) {
 void feed_key(char key) {
     if (g_kb_on) { kb_handle_key(key); return; }   // modal keyboard eats all keys
     if (key == 'B') { back(); return; }
-    // Left/Right invoke the fixed footer action (e.g. chat's Reply), so it's
-    // reachable without disturbing the Up/Down scroll position.
-    if (key == 'L' || key == 'R') { if (g_footer_cb) g_footer_cb(g_footer_user); return; }
+    // Enter invokes the fixed footer action (e.g. chat's Reply). Up/Down stay
+    // free to scroll; on a footer screen there's no focus cursor to activate.
+    if ((key == 'E' || key == '\r') && g_footer_cb) { g_footer_cb(g_footer_user); return; }
 
     Node* foc[POOL]; int cnt = 0;
     collect_focusables(g_root, foc, cnt, POOL);

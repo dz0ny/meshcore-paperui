@@ -93,8 +93,8 @@ static void create(Handle parent) {
     populate();
 
 #ifdef BOARD_WIO_L1
-    // Reply lives in the always-visible footer bar: Left/Right opens the
-    // quick-reply menu, leaving Up/Down free to scroll the message history.
+    // Reply lives in the always-visible footer bar: Enter opens the quick-reply
+    // menu, leaving Up/Down free to scroll the message history.
     mono::set_footer(i18n::t(i18n::T_REPLY), on_reply, nullptr);
 #endif
 
