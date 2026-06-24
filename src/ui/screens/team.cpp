@@ -5,7 +5,10 @@
 #include "../screen_ids.h"
 #include "../ui_screen_mgr.h"
 #include "../kit/ui_kit.h"
+#include "../i18n.h"
+#include "../components/toast.h"
 #include "../../model.h"
+#include "../../mesh/mesh_task.h"
 #include "../../util/text_filter.h"
 #include "compass.h"   // mono: tapping a member aims the compass needle at them
 // geo_utils defines ui::geo::DEG_TO_RAD; make sure no stray Arduino macro shadows it.
@@ -76,6 +79,14 @@ static void build_status(const model::ContactEntry& c, char* out, size_t n) {
         off += snprintf(out + off, n - off, "%s%s", off > 0 ? " " : "", age);
 }
 
+// Announce this node to the team — zero-hop self-advert. Same action as
+// Settings > Mesh > Advert (direct), surfaced here as a permanent top row so
+// you can ping the team without diving into settings.
+static void on_advert_zerohop(void*) {
+    mesh::task::send_advert(false);
+    ui::toast::show(i18n::t(i18n::T_ADVERT_SENT));
+}
+
 static void on_member(void* u) {
     int idx = (int)(intptr_t)u;
     if (idx < 0 || idx >= model::contact_count) return;
@@ -98,6 +109,10 @@ static void create(Handle parent) {
     model::refresh_contacts();   // pull the latest favorites / flags from the radio
 
     Handle lst = list(parent);
+
+    // Permanent action: announce ourselves to the team (zero-hop advert).
+    menu_row(lst, i18n::t(i18n::T_ADVERT_ZEROHOP), on_advert_zerohop, nullptr);
+
     int shown = 0;
     for (int i = 0; i < model::contact_count; i++) {
         const model::ContactEntry& c = model::contacts[i];
